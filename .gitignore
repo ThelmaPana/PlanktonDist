@@ -47,3 +47,9 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Drafts
+draft.R
+
+# Data
+data/
