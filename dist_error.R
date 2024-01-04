@@ -8,7 +8,7 @@
 source("utils.R")
 
 # points per img
-pt <- 10
+pt <- 20
 # number of images
 n_img <- 1
 
@@ -17,9 +17,9 @@ n_img <- 1
 #--------------------------------------------------------------------------#
 # Pick random points within an image
 r_points <- tibble(
-  x = runif(n = pt*n_img, max = 10240),
-  y = runif(n = pt*n_img, max = 2048),
-  z = runif(n = pt*n_img, max = 10240)
+  x = runif(n = pt*n_img, min = 1, max = 10240),
+  y = runif(n = pt*n_img, min = 1, max = 2048),
+  z = runif(n = pt*n_img, min = 1, max = 10240)
   ) %>% 
   mutate(img = ceiling(row_number() / pt))
 
@@ -32,15 +32,53 @@ r_points %>%
   coord_fixed()
 
 
-## Convert to spatstat object ----
+## NN distance ----
 #--------------------------------------------------------------------------#
 x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
 plot(x2D)
-nndist(x2D)
+nn2D <- nndist(x2D, k = 5)
+summary(nn2D)
 
 x3D <- pp3(r_points$x, r_points$y, r_points$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
 plot(x3D)
-nndist(x3D)
+nn3D <- nndist(x3D, k = 5)
+summary(nn3D)
+
+tibble(nn2D, nn3D) %>% 
+  ggplot() +
+  geom_point(aes(x = nn3D, y = nn2D)) +
+  geom_abline(slope = 1, color = "red") + 
+  expand_limits(x = 0, y = 0) +
+  scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0)) +
+  coord_fixed()
+
+cor(nn2D, nn3D, method = "spearman")
+# Correlation of NN distance is very bad
+# We need to go beyond NN distance
+
+# Check how the number of considered NN affect correlation between true and perceived distance
+k_nn_max <- min(100, pt)
+# Initiate tibble to sort result
+res <- tibble(k_nn = c(1:k_nn_max), rho = NA)
+for (k_nn in c(1:k_nn_max)){
+  nn2D <- nndist(x2D, k = k_nn)
+  nn3D <- nndist(x3D, k = k_nn)
+  res$rho[k_nn] = cor(nn2D, nn3D, method = "spearman")  
+}
+res %>% 
+  ggplot() +
+  geom_path(aes(x = k_nn, y = rho))
+# For a large number of points, there seems to be an optimal number of NN to consider
+# This is better than using all distances
+# When there are fewer points, the correlation is much better
+
+# How does this optimum varies according to the number of points?
+res %>% arrange(desc(rho))
+
+# Draw distributions from 1 to 50 points
+# For each distribution, find tho optimal number of NN to consider
+
+
 
 
 
