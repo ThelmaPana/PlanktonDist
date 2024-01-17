@@ -1,0 +1,503 @@
+---
+title: "Error in distances from 3D to 2D"
+format: 
+  html:
+    toc: true
+editor: visual
+lightbox: true
+---
+
+```{r}
+#| echo: false
+#| output: false
+source("utils.R")
+
+# Read data
+images <- read_parquet("data/raw/predicted_images.parquet")
+plankton <- read_parquet("data/raw/plankton_predictions.parquet")
+cops <- read_parquet("data/raw/copepods.parquet")
+```
+
+## Instrument overview
+
+ISIIS is towed in the water between 0 and 100 metres in a sawtooth like pattern, sampling \~100 L s⁻¹. ISIIS captures **frames** within a field of view of 10.5 × 10.5 × 50 cm (H × W × D). These frames are 2048 × 2048 px.
+
+![ISIIS frame, before rotation, flat fielding and equalisation.](images/vlcsnap-2024-01-17-11h47m14s896.png)
+
+Because it uses a line-scan camera and it is towed at \~constant speed, frames can be assembled together to recreate a continuous ribbon. For processing purposes (flat-fielding, segmentation…), 5 consecutive frames are assembled together to create an "**image**" of size 2048 × 10240 px.
+
+![ISIIS image, i.e. 5 consecutive frames, after rotation, flat fielding and equalisation.](images/2013-07-23_21-50-20_038699.png){fig-align="center"}
+
+See [Faillettaz et al. 2016](https://www.sciencedirect.com/science/article/abs/pii/S2211122015300177) for more details.
+
+## Dataset overview
+
+The dataset consists of two tables:
+
+-   images: processed images with associated env (T°, sal, oxy…) and metadata (coordinates, depth)
+
+-   plankton: identified planktonic organisms with image name, position within image and a set of features
+
+First, let’s keep only images in which plankton is present.
+
+```{r}
+images <- images %>% filter(img_name %in% unique(plankton$img_name))
+
+# List taxa
+taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
+```
+
+The dataset consists of `r format(nrow(plankton), big.mark = ',')` identified plankton organsims belonging to `r length(taxa)` taxonomic groups, distributed within `r format(nrow(images), big.mark = ',')`. Each image is 2048 × 10,240 px, representing 52.5 × 10.5 cm.
+
+[TODO: add copepods groups, for more taxonomic detail.]{style="color: red;"}
+
+### Have a look at one image
+
+Now let’s check what the data looks like for a given image.
+
+```{r}
+# Choose an image
+set.seed(1)
+my_img <- images %>% filter(keep) %>% sample_n(1) %>% pull(img_name)
+
+# Select objects within this image
+df <- plankton %>% filter(img_name == my_img)
+
+# Keep relevant information
+df <- df %>% 
+  select(transect, img_name, taxon, id, centroid_0, centroid_1) %>% 
+  mutate(
+    x = centroid_1 + 1, # need to add 1 because Python indexing starts at 0
+    y = centroid_0 + 1, # need to add 1 because Python indexing starts at 0
+    ) %>% 
+  select(-contains("centroid"))
+
+# Plot organisms position within image
+df %>% 
+  ggplot() +
+  geom_point(aes(x = x, y = y, colour = taxon)) +
+  scale_x_continuous(expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
+  coord_fixed() +
+  theme_bw()
+```
+
+Now let’s take a step back.
+
+### Number of organisms per image
+
+```{r}
+pl_per_img <- plankton %>% count(img_name)
+summary(pl_per_img$n)
+ggplot(pl_per_img) + geom_histogram(aes(x = n), bins = 200)
+```
+
+### Taxonomy
+
+```{r}
+plankton %>% 
+  count(taxon) %>% 
+  arrange(n) %>% 
+  mutate(taxon = fct_inorder(taxon)) %>% 
+  ggplot() +
+  geom_col(aes(x = n, y = taxon))
+```
+
+### Things to account for
+
+The dataset has a few drawbacks that need to be accounted for:
+
+-   segmentation recall (\~92%)
+
+-   classification precision and recall
+
+-   varying conditions
+
+-   variations of towing speed
+
+-   **a 3D volume is projected onto a 2D image, what information does this gave us regarding the true position of organisms?**
+
+For the latest, let’s run some simulations!
+
+## Start one example image
+
+We draw a set of points within the volume of an ISIIS image. This volume is:
+
+-   52.5 cm width = 10240 px (`x` dimension). Actually, the physical length of the image depends on the towing speed.
+
+-   10.5 cm height = 2048 px (`y` dimension).
+
+-   50 cm depth ≈ 9752 px (`z` dimension, compressed in images).
+
+```{r}
+# points per img (common for ISIIS data)
+n_pt <- 20
+# number of images
+n_img <- 1
+
+# image volume
+vol <- c()
+vol$x <- 10240
+vol$y <- 2048
+vol$z <- 9572
+```
+
+Generate the set and plot it in 2D.
+
+```{r}
+# Pick random points within an image
+r_points <- tibble(
+  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
+  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
+  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
+  ) %>% 
+  mutate(img = ceiling(row_number() / n_pt))
+
+
+# Plot one image
+r_points %>% 
+  filter(img == 1) %>% 
+  ggplot() +
+  geom_point(aes(x = x, y = y, colour = z)) +
+  scale_colour_viridis_c() +
+  coord_fixed()
+```
+
+### Distance to 1st nearest neighbour (NN)
+
+We can compute distances to nearest neighbour both in 2D and 3D and have a look at the correlation between. First, we need to convert our dataframe into point pattern objects.
+
+```{r}
+x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
+plot(x2D)
+nnd2D <- nndist(x2D, k = 1)
+
+x3D <- pp3(r_points$x, r_points$y, r_points$z, box3(xrange = c(1, vol$x), yrange = c(1, vol$y), zrange = c(1, vol$z)))
+plot(x3D)
+nnd3D <- nndist(x3D, k = 1)
+
+tibble(nnd2D, nnd3D) %>% 
+  ggplot() +
+  geom_point(aes(x = nnd3D, y = nnd2D)) +
+  geom_abline(slope = 1, color = "red") + 
+  expand_limits(x = 0, y = 0) +
+  scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0)) +
+  coord_fixed()
+
+# We use spearman because of the number of points
+cor(nnd2D, nnd3D, method = "spearman")
+```
+
+As expected, nnd2D are smaller or equal to nnd3D. When considering only one NN, the correlation is pretty bad. Let’s see what happens when we consider `k` neighbours.
+
+### k neighbours
+
+The number of NN to consider cannot exceed the `number of points - 1`.
+
+```{r}
+rho <- sapply(c(1:(n_pt-1)), function(k_nn) {
+    nn2D <- nndist(x2D, k = k_nn)
+    nn3D <- nndist(x3D, k = k_nn)
+    cor(nn2D, nn3D, method = "spearman") 
+})
+
+res <- tibble(
+  n_pt = n_pt, # number of points in the set
+  k_nn = c(1:(n_pt-1)), # number of considered NN
+  prop_nn = k_nn/n_pt, # proportion of considered NN
+  rho = rho # correlation
+  )  
+
+# Plot the result
+res %>% 
+  ggplot() +
+  geom_path(aes(x = k_nn, y = rho))
+```
+
+We can also use the proportion of considered NN as x axis, to generalise when we vary the number of points within an image.
+
+```{r}
+res %>% 
+  ggplot() +
+  geom_path(aes(x = prop_nn, y = rho))
+```
+
+Now let’s check what happens when we vary the number of points within the image.
+
+### Varying the number of points
+
+```{r}
+# Sizes of set of points
+n_pts <- c(10:15)
+
+# List of k NN to consider within each set
+k_nn <- sapply(n_pts, function(i){
+  seq(from = 2, to = i-1)
+})
+
+# List of size of set of points for df
+n_pt <- sapply(n_pts, function(i){
+  rep(i, length.out = i - 2)
+})
+
+# Df skeleton to store results
+res <- tibble(
+  k_nn = unlist(k_nn),
+  n_pt = unlist(n_pt)
+) %>% 
+  mutate(prop_nn = k_nn / n_pt)
+
+rho <- sapply(n_pts, function(i){
+  # Draw a set of points
+  r_points <- tibble(
+    x = runif(n = i, min = 1, max = 10240),
+    y = runif(n = i, min = 1, max = 2048),
+    z = runif(n = i, min = 1, max = 10240)
+  )
+  
+  # Convert to point pattern
+  x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
+  x3D <- pp3(r_points$x, r_points$y, r_points$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
+  
+  # Compute distance to k NN and correlation between 2D and 3D distance
+  sapply(c(2:(i-1)), function(k_nn) {
+    nn2D <- nndist(x2D, k = k_nn)
+    nn3D <- nndist(x3D, k = k_nn)
+    cor(nn2D, nn3D, method = "spearman") 
+  })
+  
+})
+
+# Store result in dataframe
+res <- res %>% 
+  mutate(rho = unlist(rho))
+
+# Plot
+res %>% 
+  ggplot() +
+  geom_path(aes(x = prop_nn, y = rho)) +
+  facet_wrap(~n_pt)
+```
+
+The strength of the correlation is sensible to the number of considered NN. Can we find an optimal proportion of NN to consider?
+
+To answer this question, we need to draw numerous set of points of different sizes.
+
+## Multiple images
+
+### Fixed number of points and 1 NN
+
+```{r}
+# Number of images
+n_img <- 100
+
+# Nuber of points in each images
+n_pt <- 20
+
+# Draw set of points
+r_points <- tibble(
+  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
+  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
+  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
+  ) %>% 
+  mutate(img = ceiling(row_number() / n_pt))
+
+# Compute correlations
+corrs <- sapply(1:n_img, function(i_img){# across images
+  # Convert to point pattern
+  r_points_img <- r_points %>% filter(img == i_img)
+  x2D <- ppp(r_points_img$x, r_points_img$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
+  x3D <- pp3(r_points_img$x, r_points_img$y, r_points_img$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
+  
+  # Compute NND with one neighbour
+  nnd2D <- nndist(x2D, k = 1)
+  nnd3D <- nndist(x3D, k = 1)
+  
+  # Compute correlation
+  cor(nnd2D, nnd3D, method = "spearman")
+})
+
+# each value is the correlation for one image
+summary(corrs)
+```
+
+### Fixed number of points and multiple NN
+
+Now let’s vary the number of considered NN.
+
+```{r}
+#| warning: false
+# Number of images
+n_img <- 100
+
+# Nuber of points in each images
+n_pt <- 20
+
+# Draw set of points
+r_points <- tibble(
+  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
+  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
+  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
+  ) %>% 
+  mutate(img = ceiling(row_number() / n_pt))
+
+# Compute correlation over images
+corrs <- sapply(1:n_img, function(i_img){ # across images
+  
+  # Get points corresponding to given image
+  r_points_img <- r_points %>% filter(img == i_img)
+  
+  # Convert to point pattern
+  x2D <- ppp(r_points_img$x, r_points_img$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
+  x3D <- pp3(r_points_img$x, r_points_img$y, r_points_img$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
+  
+  # Compute distance to k NN and correlation between 2D and 3D distance
+  sapply(c(2:(n_pt-1)), function(k_nn) {
+    nn2D <- nndist(x2D, k = k_nn)
+    nn3D <- nndist(x3D, k = k_nn)
+    cor(nn2D, nn3D, method = "pearson") 
+  })
+  
+})
+
+dim(corrs)
+# rows represent the number of NN considered
+# cols are images
+
+# Convert to df
+corrs <- as_tibble(corrs)
+# Set colnames
+colnames(corrs) <- str_replace(colnames(corrs), "V", "img_")
+# Add number of considered NN
+corrs <- corrs %>% 
+  mutate(
+    k_nn = 2:(n_pt - 1), 
+    prop_nn = k_nn / n_pt,
+    .before = img_1
+    )
+# Rearrange to vertical
+corrs <- corrs %>% 
+  pivot_longer(contains("img"), names_to = "img", values_to = "corr")
+
+# Plot
+ggplot(corrs) +
+  geom_path(aes(x = prop_nn, y = corr, colour = img), alpha = 0.1, show.legend = F)
+
+ggplot(corrs) +
+  geom_boxplot(aes(x = prop_nn, y = corr, group = prop_nn))
+
+
+```
+
+We want the proportion of NN that gives the best correlation.
+
+Consider using the median?
+
+```{r}
+med_corrs <- corrs %>% 
+  group_by(prop_nn) %>% 
+  summarise(med = median(corr)) %>% 
+  ungroup()
+
+ggplot(med_corrs) +
+  geom_hline(yintercept = med_corrs %>% filter(med == max(med)) %>% pull(med), colour = "red") +
+  geom_point(aes(x = prop_nn, y = med)) +
+  scale_y_continuous(limits = c(0,1)) +
+  labs(y = "Correlation median")
+```
+
+### Varying number of points and multiple NN
+
+```{r}
+# Sizes of set of points (pick something somewhat representative of ISIIS)
+n_pts <- c(5:20)
+
+# Number of images per size of set of points
+n_img <- 1000
+
+# Compute correlations
+corrs <- sapply(n_pts, function(i){ # across number of points
+  
+  # Draw a set of points
+  r_points <- tibble(
+      x = runif(n = i * n_img, min = 1, max = 10240),
+      y = runif(n = i * n_img, min = 1, max = 2048),
+      z = runif(n = i * n_img, min = 1, max = 10240)
+    ) %>% 
+    mutate(img = ceiling(row_number() / i))
+  
+  # Compute correlation over images
+  sapply(1:n_img, function(i_img){ # across images
+  
+  # Get points corresponding to given image
+    r_points_img <- r_points %>% filter(img == i_img)
+    
+    # Convert to point pattern
+    x2D <- ppp(
+      r_points_img$x, 
+      r_points_img$y, 
+      window = owin(xrange = c(1, 10240), yrange = c(1, 2048))
+    )
+    x3D <- pp3(
+      r_points_img$x, 
+      r_points_img$y, 
+      r_points_img$z, 
+      box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240))
+    )
+    
+    # Compute distance to k NN and correlation between 2D and 3D distance
+    sapply(c(2:(i-1)), function(k_nn) { # across number of NN
+      nn2D <- nndist(x2D, k = k_nn)
+      nn3D <- nndist(x3D, k = k_nn)
+      cor(nn2D, nn3D, method = "pearson") 
+    })
+  })
+})
+
+# This returns a list, 1 element of the list = 1 size of set of points
+# In each list,
+# - cols are images
+# - rows are number of considered NN
+
+# Bind lists into a dataframe
+corrs <- do.call(rbind, corrs) %>% as_tibble()
+
+# Set colnames
+colnames(corrs) <- str_replace(colnames(corrs), "V", "img_")
+
+# Columns are images
+# We need to fill
+# - number of points
+# - number of considered NN
+corrs <- corrs %>% 
+  mutate(
+    # List of size of set of points for df
+    n_pt = unlist(sapply(n_pts, function(i){rep(i, length.out = i - 2)})),
+    # List of k NN to consider within each set
+    k_nn = unlist(sapply(n_pts, function(i){seq(from = 2, to = i-1)})),
+    prop_nn = k_nn / n_pt,
+    .before = img_1
+  )
+
+# Rearrange to vertical
+corrs <- corrs %>% 
+  pivot_longer(contains("img"), names_to = "img", values_to = "corr")
+
+```
+
+Have a look at the median.
+
+```{r}
+#| warning: false
+med_corrs <- corrs %>% 
+  group_by(n_pt, prop_nn) %>% 
+  summarise(med = median(corr)) %>% 
+  ungroup()
+
+best_med <- med_corrs %>% filter(med == max(med)) %>% pull(med)
+
+ggplot(med_corrs) + 
+  geom_path(aes(x = prop_nn, y = med, group = n_pt, colour = n_pt)) +
+  scale_colour_viridis_c() +
+  scale_y_continuous(limits = c(0,1)) +
+  labs(y = "Correlation median")
+```

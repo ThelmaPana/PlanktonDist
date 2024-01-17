@@ -1,35 +1,37 @@
 ## Packages ----
 #--------------------------------------------------------------------------#
-library(tidyverse)
+suppressWarnings(library(tidyverse))
 
 # Reading data
-library(arrow)
+suppressWarnings(library(arrow))
 
 # Spatial point pattern
-library(spatstat)
-library(dixon)
+suppressWarnings(library(spatstat))
+suppressWarnings(library(dixon))
 
 # Co-occurrence network
-library(cooccur)
-library(visNetwork)
+suppressWarnings(library(cooccur))
+suppressWarnings(library(visNetwork))
 
 # Species association network
-library(EMtree)
-library(ade4)
-library(PLNmodels)
+suppressWarnings(library(EMtree))
+suppressWarnings(library(ade4))
+suppressWarnings(library(PLNmodels))
 
 # Plots
-library(gridExtra)
-library(ggraph)
-library(RColorBrewer)
-library(tidygraph)
-library(ggpubr)
-library(patchwork)
+suppressWarnings(library(gridExtra))
+suppressWarnings(library(ggraph))
+suppressWarnings(library(RColorBrewer))
+suppressWarnings(library(tidygraph))
+suppressWarnings(library(ggpubr))
+suppressWarnings(library(patchwork))
+
 
 theme_set(theme_minimal())
 
 
-#################################################################################
+## Resampling procedure for  edges probability ----
+#--------------------------------------------------------------------------#
 #' Resampling procedure for  edges probability
 #'
 #' @param counts Data of observed counts with dimensions n x p, either a matrix, data.frame or tibble.
