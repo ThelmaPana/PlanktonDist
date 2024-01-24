@@ -139,6 +139,7 @@ vol <- c()
 vol$x <- 10240
 vol$y <- 2048
 vol$z <- 9572
+
 ```
 
 Generate the set and plot it in 2D.
@@ -164,9 +165,11 @@ r_points %>%
 
 ### Distance to 1st nearest neighbour (NN)
 
-We can compute distances to nearest neighbour both in 2D and 3D and have a look at the correlation between. First, we need to convert our dataframe into point pattern objects.
+We can compute distances to nearest neighbour both in 2D and 3D and have a look at the correlation between. Let’s start with `spearman` correlation. First, we need to convert our dataframe into point pattern objects.
 
 ```{r}
+type_corr <- "spearman"
+
 x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
 plot(x2D)
 nnd2D <- nndist(x2D, k = 1)
@@ -184,7 +187,7 @@ tibble(nnd2D, nnd3D) %>%
   coord_fixed()
 
 # We use spearman because of the number of points
-cor(nnd2D, nnd3D, method = "spearman")
+cor(nnd2D, nnd3D, method = type_corr)
 ```
 
 As expected, nnd2D are smaller or equal to nnd3D. When considering only one NN, the correlation is pretty bad. Let’s see what happens when we consider `k` neighbours.
@@ -197,7 +200,7 @@ The number of NN to consider cannot exceed the `number of points - 1`.
 rho <- sapply(c(1:(n_pt-1)), function(k_nn) {
     nn2D <- nndist(x2D, k = k_nn)
     nn3D <- nndist(x3D, k = k_nn)
-    cor(nn2D, nn3D, method = "spearman") 
+    cor(nn2D, nn3D, method = type_corr) 
 })
 
 res <- tibble(
@@ -262,7 +265,7 @@ rho <- sapply(n_pts, function(i){
   sapply(c(2:(i-1)), function(k_nn) {
     nn2D <- nndist(x2D, k = k_nn)
     nn3D <- nndist(x3D, k = k_nn)
-    cor(nn2D, nn3D, method = "spearman") 
+    cor(nn2D, nn3D, method = type_corr) 
   })
   
 })
@@ -313,7 +316,7 @@ corrs <- sapply(1:n_img, function(i_img){# across images
   nnd3D <- nndist(x3D, k = 1)
   
   # Compute correlation
-  cor(nnd2D, nnd3D, method = "spearman")
+  cor(nnd2D, nnd3D, method = type_corr)
 })
 
 # each value is the correlation for one image

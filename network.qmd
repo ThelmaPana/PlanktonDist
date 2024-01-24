@@ -1,0 +1,129 @@
+---
+title: "Ecological Network"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+editor: visual
+lightbox: true
+---
+
+```{r}
+#| echo: false
+#| output: false
+#| warning: false
+source("utils.R")
+```
+
+Read data and list taxa.
+
+```{r}
+#| eval: false
+plankton <- read_parquet("data/raw/plankton_predictions.parquet")
+cops <- read_parquet("data/raw/copepods.parquet")
+
+## Refine copepods taxonomy in plankton table
+df <- plankton %>% 
+  # keep only relevant columns
+  select(
+    transect, img_name, object_id = id, taxon,
+    datetime, lat, lon, dist, depth,
+    centroid_0, centroid_1
+  ) %>% 
+  # join with cops
+  left_join(cops %>% select(object_id, new_taxon = taxon), by = join_by(object_id)) %>% 
+  # keep only new taxonomy if present
+  mutate(taxon = ifelse(!is.na(new_taxon), new_taxon, taxon)) %>% 
+  select(-new_taxon)
+rm(plankton, cops)
+
+## Clean taxa list
+# Read clean taxa names
+clean_taxa <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE)
+taxa <- clean_taxa %>% drop_na(new_taxon) %>% pull(new_taxon) %>% sort()
+
+# Add clean taxa names to plankton table
+df <- df %>% 
+  left_join(clean_taxa, by = join_by(taxon)) %>% 
+  select(-taxon) %>% 
+  rename(taxon = new_taxon) %>% 
+  # drop objects that should be ignored
+  drop_na(taxon)
+
+# Print list of taxa
+taxa
+```
+
+```{mermaid}
+%%{init: {'theme':'neutral'}}%%
+graph LR
+%% Nodes
+  Acantharea:::mixotroph
+  Actinopterygii
+  Annelida:::carnivorous
+  Appendicularia
+  Aulacanthidae:::detritivore
+  Chaetognatha:::carnivorous
+  Collodaria_colonial:::mixotroph
+  Collodaria_solitaryblack:::mixotroph
+  Cop_Calanoida
+  Cop_Calanus:::herbivorous
+  Cop_Euchaeta:::carnivorous
+  Cop_Euchaeta_juv
+  Cop_Harpacticoida
+  Cop_Heterorhabdus
+  Cop_ogiverous
+  Cop_Oithona:::herbivorous
+  Cop_other
+  Cop_Pleuromamma
+  Cop_small:::herbivorous
+  Crustacea_other
+  Ctenophora
+  Doliolida:::herbivorous
+  Eumalacostraca
+  Hydrozoa
+  Mollusca
+  Pyrocystis
+  Rhizaria
+  Scyphozoa_ephyra:::carnivorous
+  Siphonophorae:::carnivorous
+  phyto((Phyto)):::phyto
+
+%% Links
+  phyto --> Acantharea
+  phyto --> Appendicularia
+  phyto --> Collodaria_colonial
+  phyto --> Collodaria_solitaryblack
+  phyto --> Cop_Calanoida
+  phyto --> Cop_Calanus
+  phyto --> Cop_Harpacticoida
+  phyto --> Cop_small
+  phyto --> Cop_Oithona
+  phyto --> Copepoda
+  phyto --> Doliolida
+  phyto --> Copepoda
+
+  Cop_small --> Acantharea
+  Cop_small --> Cop_Euchaeta
+
+  Acantharea --> Acantharea
+
+  Copepoda --> Scyphozoa_ephyra
+  Copepoda --> Chaetognatha
+  Copepoda --> Ctenophora
+  Copepoda --> Siphonophorae
+
+  Cop_small --> Siphonophorae
+
+  Rhizaria --> Rhizaria
+
+%% Classes
+ classDef carnivorous fill:#ed8a79
+ classDef detritivore fill:#bd9a66
+ classDef herbivorous fill:#ace892
+ classDef omnivorous fill:#917cd9
+ classDef mixotroph fill:#79aded
+ classDef phyto fill:#90d1a4
+ 
+ 
+```
