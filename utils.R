@@ -1,6 +1,11 @@
 ## Packages ----
 #--------------------------------------------------------------------------#
 suppressWarnings(library(tidyverse))
+suppressWarnings(library(here))
+suppressWarnings(library(reshape2))
+
+# Null hypothesis
+suppressWarnings(library(MASS))
 
 # Reading data
 suppressWarnings(library(arrow))
@@ -25,9 +30,25 @@ suppressWarnings(library(RColorBrewer))
 suppressWarnings(library(tidygraph))
 suppressWarnings(library(ggpubr))
 suppressWarnings(library(patchwork))
+suppressWarnings(library(cmocean))
+suppressWarnings(library(scales))
 
 
 theme_set(theme_minimal())
+
+
+## Directories ----
+#--------------------------------------------------------------------------#
+data_dir <- here("data")
+
+
+## Seed ----
+#--------------------------------------------------------------------------#
+seed <- 1
+
+## Coast data ----
+#--------------------------------------------------------------------------#
+coast <- read_csv(file.path(data_dir, "raw/coast.csv"), show_col_types = FALSE)
 
 
 ## Resampling procedure for  edges probability ----
