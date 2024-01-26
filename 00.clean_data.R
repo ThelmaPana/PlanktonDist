@@ -32,7 +32,7 @@ plankton <- plankton %>%
 
 # Read clean taxa names
 clean_taxa <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE)
-taxa <- clean_taxa %>% drop_na(new_taxon) %>% pull(new_taxon) %>% sort()
+taxa <- clean_taxa %>% select(taxon = orig_name, new_taxon = new_name) %>% drop_na(new_taxon) %>% pull(new_taxon) %>% sort()
 
 # Add clean taxa names to plankton table
 plankton <- plankton %>% 
