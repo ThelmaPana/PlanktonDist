@@ -143,6 +143,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="co"># Print list of taxa</span></span>
 <span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>taxa</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "Acantharea"               "Actinopterygii"          
+ [3] "Annelida"                 "Appendicularia"          
+ [5] "Aulacanthidae"            "Chaetognatha"            
+ [7] "Collodaria_colonial"      "Collodaria_solitaryblack"
+ [9] "Cop_Calanoida"            "Cop_Calanus"             
+[11] "Cop_Euchaeta"             "Cop_Euchaeta_juv"        
+[13] "Cop_Harpacticoida"        "Cop_Heterorhabdus"       
+[15] "Cop_ogiverous"            "Cop_Oithona"             
+[17] "Cop_other"                "Cop_Pleuromamma"         
+[19] "Cop_small"                "Crustacea_other"         
+[21] "Ctenophora"               "Doliolida"               
+[23] "Eumalacostraca"           "Hydrozoa"                
+[25] "Mollusca"                 "Pyrocystis"              
+[27] "Rhizaria"                 "Scyphozoa_ephyra"        
+[29] "Siphonophorae"           </code></pre>
+</div>
 </div>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
@@ -155,7 +172,7 @@ graph LR
   Acantharea:::mixotroph
   Actinopterygii
   Annelida:::carnivorous
-  Appendicularia
+  Appendicularia:::herbivorous
   Aulacanthidae:::detritivore
   Chaetognatha:::carnivorous
   Collodaria_colonial:::mixotroph
@@ -172,7 +189,7 @@ graph LR
   Cop_Pleuromamma
   Cop_small:::herbivorous
   Crustacea_other
-  Ctenophora
+  Ctenophora:::carnivorous
   Doliolida:::herbivorous
   Eumalacostraca
   Hydrozoa
