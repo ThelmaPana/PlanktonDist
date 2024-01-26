@@ -1,0 +1,85 @@
+---
+title: "Generate random data for our null hypothesis"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+source("utils.R")
+```
+
+Subsample data (only performed once).
+
+```{r read}
+
+## All data
+images <- read_parquet("data/00.images_clean.parquet")
+plankton <- read_parquet("data/00.plankton_clean.parquet")
+
+## Subsample
+#load("data/00.subsample.Rdata")
+#plankton <- plankton_sub
+#images <- images_sub
+
+# list img names
+img_names <- sort(unique(images$img_name))
+```
+
+Define window size for point pattern analysis.
+
+```{r vol_size}
+# image volume in pixels
+vol <- c()
+vol$x <- 10240
+vol$y <- 2048
+vol$z <- 9572
+```
+
+## Overall randomness
+
+To investigate overall randomness, let’s compute distances between all pairs of organisms within an image.
+
+```{r all_dist}
+# Loop over images and compute distances between all points within each image
+dist_all <- lapply(img_names, function(name) {
+  # Get points within image
+  points <- plankton %>% 
+    filter(img_name == name) %>% 
+    select(centroid_0, centroid_1) %>% 
+    as.matrix()
+  # Compute distances between points
+  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
+    as_tibble() %>% 
+    filter(p1 != p2) %>% 
+    rename(dist = value) %>% 
+    mutate(img_name = name)
+})
+
+# Combine results in a dataframe
+dist_all <- do.call(bind_rows, dist_all)
+
+# Plot all
+ggplot(dist_all) + 
+  geom_density(aes(x = dist, colour = img_name), linewidth = 0.1, show.legend = F) +
+  geom_density(aes(x = dist))
+```
+
+## Intra-specific
+
+## Inter-specific
+
+```{r norm}
+#| eval: false
+ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+  stat_function(fun = dnorm) +
+  theme_void()
+```
