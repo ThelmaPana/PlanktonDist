@@ -92,7 +92,7 @@ rand_points <- lapply(1:n_img, function(i){
 rand_points <- do.call(bind_rows, rand_points)
 
 # Save it
-save(rand_points, file = "01.null_hypothesis.Rdata")
+save(rand_points, file = "data/01.null_hypothesis.Rdata")
 ```
 
 Compute and plot distances between all objects within each image.
