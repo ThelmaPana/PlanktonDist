@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.542">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Thelma Panaïotis">
+
+<title>Notes on individual plankton distances</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="notes_files/libs/clipboard/clipboard.min.js"></script>
+<script src="notes_files/libs/quarto-html/quarto.js"></script>
+<script src="notes_files/libs/quarto-html/popper.min.js"></script>
+<script src="notes_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="notes_files/libs/quarto-html/anchor.min.js"></script>
+<link href="notes_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="notes_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="notes_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="notes_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="notes_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#analysis-stages" id="toc-analysis-stages" class="nav-link active" data-scroll-target="#analysis-stages">Analysis stages</a></li>
+  <li><a href="#importance-of-this-work" id="toc-importance-of-this-work" class="nav-link" data-scroll-target="#importance-of-this-work">Importance of this work</a></li>
+  <li><a href="#feeding-strategies" id="toc-feeding-strategies" class="nav-link" data-scroll-target="#feeding-strategies">Feeding strategies</a>
+  <ul class="collapse">
+  <li><a href="#acantharea" id="toc-acantharea" class="nav-link" data-scroll-target="#acantharea">Acantharea</a></li>
+  <li><a href="#actinopterygii" id="toc-actinopterygii" class="nav-link" data-scroll-target="#actinopterygii">Actinopterygii</a></li>
+  <li><a href="#annelida" id="toc-annelida" class="nav-link" data-scroll-target="#annelida">Annelida</a></li>
+  <li><a href="#appendicularia" id="toc-appendicularia" class="nav-link" data-scroll-target="#appendicularia">Appendicularia</a></li>
+  <li><a href="#aulacanthidae" id="toc-aulacanthidae" class="nav-link" data-scroll-target="#aulacanthidae">Aulacanthidae</a></li>
+  <li><a href="#chaetognatha" id="toc-chaetognatha" class="nav-link" data-scroll-target="#chaetognatha">Chaetognatha</a></li>
+  <li><a href="#collodaria_colonial" id="toc-collodaria_colonial" class="nav-link" data-scroll-target="#collodaria_colonial">Collodaria_colonial</a></li>
+  <li><a href="#collodaria_solitaryblack" id="toc-collodaria_solitaryblack" class="nav-link" data-scroll-target="#collodaria_solitaryblack">Collodaria_solitaryblack</a></li>
+  <li><a href="#cop_calanoida" id="toc-cop_calanoida" class="nav-link" data-scroll-target="#cop_calanoida">Cop_Calanoida</a></li>
+  <li><a href="#cop_calanus" id="toc-cop_calanus" class="nav-link" data-scroll-target="#cop_calanus">Cop_Calanus</a></li>
+  <li><a href="#cop_euchaeta" id="toc-cop_euchaeta" class="nav-link" data-scroll-target="#cop_euchaeta">Cop_Euchaeta</a></li>
+  <li><a href="#cop_euchaeta_juv" id="toc-cop_euchaeta_juv" class="nav-link" data-scroll-target="#cop_euchaeta_juv">Cop_Euchaeta_juv</a></li>
+  <li><a href="#cop_harpacticoida" id="toc-cop_harpacticoida" class="nav-link" data-scroll-target="#cop_harpacticoida">Cop_Harpacticoida</a></li>
+  <li><a href="#cop_heterorhabdus" id="toc-cop_heterorhabdus" class="nav-link" data-scroll-target="#cop_heterorhabdus">Cop_Heterorhabdus</a></li>
+  <li><a href="#cop_ogiverous" id="toc-cop_ogiverous" class="nav-link" data-scroll-target="#cop_ogiverous">Cop_ogiverous</a></li>
+  <li><a href="#cop_oithona" id="toc-cop_oithona" class="nav-link" data-scroll-target="#cop_oithona">Cop_Oithona</a></li>
+  <li><a href="#cop_other" id="toc-cop_other" class="nav-link" data-scroll-target="#cop_other">Cop_other</a></li>
+  <li><a href="#cop_pleuromamma" id="toc-cop_pleuromamma" class="nav-link" data-scroll-target="#cop_pleuromamma">Cop_Pleuromamma</a></li>
+  <li><a href="#cop_small" id="toc-cop_small" class="nav-link" data-scroll-target="#cop_small">Cop_small</a></li>
+  <li><a href="#crustacea_other" id="toc-crustacea_other" class="nav-link" data-scroll-target="#crustacea_other">Crustacea_other</a></li>
+  <li><a href="#ctenophora" id="toc-ctenophora" class="nav-link" data-scroll-target="#ctenophora">Ctenophora</a></li>
+  <li><a href="#doliolida" id="toc-doliolida" class="nav-link" data-scroll-target="#doliolida">Doliolida</a></li>
+  <li><a href="#eumalacostraca" id="toc-eumalacostraca" class="nav-link" data-scroll-target="#eumalacostraca">Eumalacostraca</a></li>
+  <li><a href="#hydrozoa" id="toc-hydrozoa" class="nav-link" data-scroll-target="#hydrozoa">Hydrozoa</a></li>
+  <li><a href="#mollusca" id="toc-mollusca" class="nav-link" data-scroll-target="#mollusca">Mollusca</a></li>
+  <li><a href="#pyrocystis" id="toc-pyrocystis" class="nav-link" data-scroll-target="#pyrocystis">Pyrocystis</a></li>
+  <li><a href="#rhizaria" id="toc-rhizaria" class="nav-link" data-scroll-target="#rhizaria">Rhizaria</a></li>
+  <li><a href="#scyphozoa_ephyra" id="toc-scyphozoa_ephyra" class="nav-link" data-scroll-target="#scyphozoa_ephyra">Scyphozoa_ephyra</a></li>
+  <li><a href="#siphonophorae" id="toc-siphonophorae" class="nav-link" data-scroll-target="#siphonophorae">Siphonophorae</a></li>
+  </ul></li>
+  <li><a href="#building-the-network" id="toc-building-the-network" class="nav-link" data-scroll-target="#building-the-network">Building the network</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Notes on individual plankton distances</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Thelma Panaïotis </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="analysis-stages" class="level1">
+<h1>Analysis stages</h1>
+<ul>
+<li><p>Overall randomness</p></li>
+<li><p>Intra-specific</p></li>
+<li><p>Inter-specific</p></li>
+</ul>
+</section>
+<section id="importance-of-this-work" class="level1">
+<h1>Importance of this work</h1>
+<ul>
+<li>this scale is the relevant one to understand the ecology of planktonic organisms</li>
+</ul>
+<p><u>Robinson et al.&nbsp;2021</u>:</p>
+<ul>
+<li><p>spatial heterogeneity in plankton across a wide range of scales</p></li>
+<li><p>ecological importance</p></li>
+<li><p>biological processes are more important at small scale</p></li>
+<li><p>rather unknown</p></li>
+<li><p>fine-scale patchiness important for: fitness, locating mates, finding preys and avoiding predators. Come from theory + lab work.</p></li>
+<li><p>mean background density does not represent the actual environment experienced by an individual -&gt; importance to go at smaller scales</p></li>
+</ul>
+<p><u>Benoit-Bird et al.&nbsp;2013</u>:</p>
+<ul>
+<li><p>aggregations of plankton are vertically compressed (&lt; 5 m in vertical)</p></li>
+<li><p>signature of:  physical, chemical and biological processes</p></li>
+</ul>
+<p><u>Haury et al.&nbsp;1987</u>:</p>
+<ul>
+<li><p>aggregation / patches on a wide variety of space and time scales, including for plankton</p></li>
+<li><p>general phenomenon:  ecological and evolutionary importance</p></li>
+<li><p>investigate deviation from random expectation as a 1st step</p></li>
+<li><p>at the species / individual level, we can investigate</p>
+<ul>
+<li><p>inter and intra species competitions</p></li>
+<li><p>niche partitioning</p></li>
+<li><p>relationship to environmental parameters</p></li>
+</ul></li>
+<li><p>micro-scale = 1 cm to 1 m</p></li>
+<li><p>see: Bainbridge, 1952; Cassie, 1959; Owen,1966; Emery, 1968; <u>Clutter, 1969</u>, <u>Anraku 1975</u></p></li>
+</ul>
+<p><u>Levin 1992</u></p>
+</section>
+<section id="feeding-strategies" class="level1">
+<h1>Feeding strategies</h1>
+<section id="acantharea" class="level2">
+<h2 class="anchored" data-anchor-id="acantharea">Acantharea</h2>
+<p><strong>Mixotrophic</strong></p>
+<ul>
+<li><p>Decelle et al.&nbsp;2013: Acantharia are known to ingest a wide range of prey, such as bacteria, microalgae and even zooplankton</p></li>
+<li><p>Swanberg and Caron, 1991: diatoms, eggs, protists, copepods, mollusc larvae, Acantharia</p></li>
+<li><p>Decelle 2015: mostly grazers, some species are mixotrophic (the case for our species)</p></li>
+<li><p>Suzuki 2015: mostly unknown, same as predators</p></li>
+</ul>
+</section>
+<section id="actinopterygii" class="level2">
+<h2 class="anchored" data-anchor-id="actinopterygii">Actinopterygii</h2>
+</section>
+<section id="annelida" class="level2">
+<h2 class="anchored" data-anchor-id="annelida">Annelida</h2>
+<ul>
+<li>Nival et al.&nbsp;2019: Carnivorous</li>
+</ul>
+<p>Poorly studied.</p>
+</section>
+<section id="appendicularia" class="level2">
+<h2 class="anchored" data-anchor-id="appendicularia">Appendicularia</h2>
+</section>
+<section id="aulacanthidae" class="level2">
+<h2 class="anchored" data-anchor-id="aulacanthidae">Aulacanthidae</h2>
+</section>
+<section id="chaetognatha" class="level2">
+<h2 class="anchored" data-anchor-id="chaetognatha">Chaetognatha</h2>
+<p>Ambush predators, mostly eat cladoceran and copepods, but also amphipods, krill and fish larvae. Feed also on younger chaetognaths. Some species are omnivores (in the Arctic).</p>
+<ul>
+<li><p>Pearre 1981</p></li>
+<li><p>Kruse 2018: copepods is the principal prey. Preyed-on by amphipods and fish.</p></li>
+<li><p>Sullivan 1980: large variety of prey size, but prefer cyclopoid copepods (juveniles chaetognaths)</p></li>
+</ul>
+</section>
+<section id="collodaria_colonial" class="level2">
+<h2 class="anchored" data-anchor-id="collodaria_colonial">Collodaria_colonial</h2>
+<p><strong>Mixotrophic</strong></p>
+<ul>
+<li>Decelle et al.&nbsp;2012: Broad range of preys, including copepods, ciliates, phytoplankton (also Swanberg and Caron 1991)</li>
+</ul>
+</section>
+<section id="collodaria_solitaryblack" class="level2">
+<h2 class="anchored" data-anchor-id="collodaria_solitaryblack">Collodaria_solitaryblack</h2>
+<p><strong>Mixotrophic</strong></p>
+<p>Same as above.</p>
+</section>
+<section id="cop_calanoida" class="level2">
+<h2 class="anchored" data-anchor-id="cop_calanoida">Cop_Calanoida</h2>
+</section>
+<section id="cop_calanus" class="level2">
+<h2 class="anchored" data-anchor-id="cop_calanus">Cop_Calanus</h2>
+</section>
+<section id="cop_euchaeta" class="level2">
+<h2 class="anchored" data-anchor-id="cop_euchaeta">Cop_Euchaeta</h2>
+</section>
+<section id="cop_euchaeta_juv" class="level2">
+<h2 class="anchored" data-anchor-id="cop_euchaeta_juv">Cop_Euchaeta_juv</h2>
+</section>
+<section id="cop_harpacticoida" class="level2">
+<h2 class="anchored" data-anchor-id="cop_harpacticoida">Cop_Harpacticoida</h2>
+</section>
+<section id="cop_heterorhabdus" class="level2">
+<h2 class="anchored" data-anchor-id="cop_heterorhabdus">Cop_Heterorhabdus</h2>
+</section>
+<section id="cop_ogiverous" class="level2">
+<h2 class="anchored" data-anchor-id="cop_ogiverous">Cop_ogiverous</h2>
+</section>
+<section id="cop_oithona" class="level2">
+<h2 class="anchored" data-anchor-id="cop_oithona">Cop_Oithona</h2>
+<p>Omnivorous.</p>
+</section>
+<section id="cop_other" class="level2">
+<h2 class="anchored" data-anchor-id="cop_other">Cop_other</h2>
+<p>Unpsecified, likely omnivorous.</p>
+</section>
+<section id="cop_pleuromamma" class="level2">
+<h2 class="anchored" data-anchor-id="cop_pleuromamma">Cop_Pleuromamma</h2>
+</section>
+<section id="cop_small" class="level2">
+<h2 class="anchored" data-anchor-id="cop_small">Cop_small</h2>
+</section>
+<section id="crustacea_other" class="level2">
+<h2 class="anchored" data-anchor-id="crustacea_other">Crustacea_other</h2>
+<p>Unpsecified, likely carnivorous.</p>
+</section>
+<section id="ctenophora" class="level2">
+<h2 class="anchored" data-anchor-id="ctenophora">Ctenophora</h2>
+<ul>
+<li>Haddock 2007: deploy their two tentacles to catch preys, e.g.&nbsp;Copepoda. Carnivorous.</li>
+</ul>
+</section>
+<section id="doliolida" class="level2">
+<h2 class="anchored" data-anchor-id="doliolida">Doliolida</h2>
+<ul>
+<li><p>Conley et al.&nbsp;2008: filter-feeder using mucous meshes.</p></li>
+<li><p>Clerc at al.&nbsp;2023: various preys. Represented as non-selective feeders.</p></li>
+<li><p>Walters et al.&nbsp;2018: wild-caught <em>Dolioletta gegenbauri</em>: Radiolaria, protists, chaetognaths, molluscs, copepods and Cnidaria</p></li>
+</ul>
+<p>Preyed on by Sapphirina.</p>
+</section>
+<section id="eumalacostraca" class="level2">
+<h2 class="anchored" data-anchor-id="eumalacostraca">Eumalacostraca</h2>
+<p>Likely carnivorous.</p>
+</section>
+<section id="hydrozoa" class="level2">
+<h2 class="anchored" data-anchor-id="hydrozoa">Hydrozoa</h2>
+</section>
+<section id="mollusca" class="level2">
+<h2 class="anchored" data-anchor-id="mollusca">Mollusca</h2>
+<p>Mostly pteropods, filter-feeders using mucous nets.</p>
+</section>
+<section id="pyrocystis" class="level2">
+<h2 class="anchored" data-anchor-id="pyrocystis">Pyrocystis</h2>
+</section>
+<section id="rhizaria" class="level2">
+<h2 class="anchored" data-anchor-id="rhizaria">Rhizaria</h2>
+<ul>
+<li>Swanberg and Caron, 1991: diatoms, eggs, protists, copepods, mollusc larvae, Acantharia, Rhizaria</li>
+</ul>
+</section>
+<section id="scyphozoa_ephyra" class="level2">
+<h2 class="anchored" data-anchor-id="scyphozoa_ephyra">Scyphozoa_ephyra</h2>
+<p>Carnivorous</p>
+</section>
+<section id="siphonophorae" class="level2">
+<h2 class="anchored" data-anchor-id="siphonophorae">Siphonophorae</h2>
+<ul>
+<li>Nival et al.&nbsp;2019: predators of meso-zooplankton, ambush predator.</li>
+</ul>
+</section>
+</section>
+<section id="building-the-network" class="level1">
+<h1>Building the network</h1>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      return note.innerHTML;
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -1,0 +1,224 @@
+---
+title: "Dataset presentation"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set-up}
+#| echo: false
+#| output: false
+#| warning: false
+source(here::here("utils.R"))
+```
+
+```{r load_data}
+#| cache.lazy: false
+images <- read_parquet("data/00.images_clean.parquet")
+plankton <- read_parquet("data/00.plankton_clean.parquet")
+```
+
+## Instrument overview
+
+ISIIS is towed in the water between 0 and 100 metres in a sawtooth like pattern, sampling \~100 L s⁻¹. ISIIS captures **frames** within a field of view of 10.5 × 10.5 × 50 cm (H × W × D). These frames are 2048 × 2048 px.
+
+![ISIIS frame, before rotation, flat fielding and equalisation.](images/vlcsnap-2024-01-17-11h47m14s896.png)
+
+Because it uses a line-scan camera and it is towed at \~constant speed, frames can be assembled together to recreate a continuous ribbon. For processing purposes (flat-fielding, segmentation…), 5 consecutive frames are assembled together to create an "**image**" of size 2048 × 10240 px.
+
+![ISIIS image, i.e. 5 consecutive frames, after rotation, flat fielding and equalisation.](images/2013-07-23_21-50-20_038699.png){fig-align="center"}
+
+See [Faillettaz et al. 2016](https://www.sciencedirect.com/science/article/abs/pii/S2211122015300177) for more details.
+
+## Dataset overview
+
+The dataset consists of two tables:
+
+-   images: processed images with associated env (T°, sal, oxy…) and metadata (coordinates, depth)
+
+-   plankton: identified planktonic organisms with image name, position within image and a set of features
+
+First, let’s keep only images in which plankton is present.
+
+```{r filter_img}
+images <- images %>% filter(img_name %in% unique(plankton$img_name))
+
+# List taxa
+taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
+```
+
+The dataset consists of `r format(nrow(plankton), big.mark = ',')` identified plankton organsims belonging to `r length(taxa)` taxonomic groups, distributed within `r format(nrow(images), big.mark = ',')`. Each image is 2048 × 10,240 px, representing 52.5 × 10.5 cm.
+
+### Have a look at one image
+
+Now let’s check what the data looks like for a given image.
+
+```{r plot_one_image}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 3
+# Choose an image
+set.seed(seed)
+my_img <- images %>% filter(keep) %>% sample_n(1) %>% pull(img_name)
+
+# Select objects within this image
+df <- plankton %>% filter(img_name == my_img)
+
+# Keep relevant information
+df <- df %>% 
+  select(transect, img_name, taxon, id, centroid_0, centroid_1) %>% 
+  mutate(
+    x = centroid_1 + 1, # need to add 1 because Python indexing starts at 0
+    y = centroid_0 + 1, # need to add 1 because Python indexing starts at 0
+    ) %>% 
+  select(-contains("centroid"))
+
+# Plot organisms position within image
+df %>% 
+  ggplot() +
+  geom_point(aes(x = x, y = y, colour = taxon)) +
+  scale_x_continuous(expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
+  coord_fixed() +
+  theme_bw()
+```
+
+Now let’s take a step back.
+
+::: callout-note
+## "2013-07-28_02-58-43_974204" has many copepods, have a look at it!
+:::
+
+### Number of organisms per image
+
+```{r nb_org}
+pl_per_img <- plankton %>% count(img_name)
+summary(pl_per_img$n)
+ggplot(pl_per_img) + 
+  geom_histogram(aes(x = n), bins = 200) +
+  scale_y_log10()
+```
+
+### Taxonomy
+
+```{r taxo_comp}
+plankton %>% 
+  count(taxon) %>% 
+  arrange(n) %>% 
+  mutate(taxon = fct_inorder(taxon)) %>% 
+  ggplot() +
+  geom_col(aes(x = n, y = taxon)) + 
+  scale_x_log10()
+```
+
+## Campaign overview
+
+-   summer 2013: July 23rd to 29th
+
+-   sampling between 0 - 100 m
+
+-   28 transects (see map below)
+
+    -   7 along current
+
+    -   7 cross current
+
+    -   14 "lagrangian"
+
+### Map
+
+```{r camp_map}
+camp <- images %>% 
+  select(
+    transect, img_name, 
+    lon, lat, datetime, dist, depth,
+    yo, yo_type, period,
+    temp:dens
+    )
+
+camp %>% 
+  group_by(transect, yo) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  mutate(transect_type = str_split_fixed(transect, "_", n = 2)[,1], .after = transect) %>% 
+  ggplot(aes(x = lon, y = lat)) +
+  geom_path(aes(group = transect, colour = transect_type)) +
+  geom_polygon(data = coast, fill = "gray") +
+  labs(x = "Longitude", y = "Latitude", colour = "Transect\ntype") +
+  coord_quickmap(expand = FALSE)
+```
+
+### Time
+
+```{r camp_time}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 4
+# Nice color palette
+cols <- c(
+    "dawn" = "#fc8d62", 
+    "day" = "#80b1d3", 
+    "dusk" = "#df65b0", 
+    "night" = "#022660"
+)
+
+# Get beginning and end of each transect
+transect_times <- camp %>% 
+  group_by(transect) %>% 
+  slice(c(1,n())) %>% 
+  ungroup() %>% 
+  select(transect, datetime, period)
+
+transect_times %>% 
+  ggplot() +
+  geom_path(aes(x = datetime, y = transect, group = transect, colour = period), linewidth = 3) +
+  scale_colour_manual(values = cols) +
+  scale_x_datetime(
+    date_breaks = "12 hours", 
+    expand = c(0,0),
+    labels = label_date_short(format = c("","", "%m/%d", "%H:%M"), sep = "\n"),
+    limits = c(
+      floor_date(min(transect_times$datetime), unit = "day"), 
+      ceiling_date(max(transect_times$datetime), unit = "day")
+    )
+  ) +
+  labs(x = "Datetime (CEST)", y = "Transect", color = "Period") 
+```
+
+### Environmental data
+
+![Environmental conditions during one of the cross-current transects.](images/env_data.png)
+
+## Things to account for
+
+### Non biological
+
+The dataset has a few drawbacks that need to be accounted for:
+
+-   segmentation recall (\~92%) ➝ run simulations?
+
+-   classification precision and recall
+
+-   varying conditions (env, day VS night…)
+
+-   variations of towing speed, i.e. pixel size in `x` axis can vary, but there are round objects in the dataset, and their deformation can provide information to correct this bias.
+
+-   a 3D volume is projected onto a 2D image, what information does this gave us regarding the true position of organisms? ➝ run simulations
+
+### Biological
+
+-   motility: some organisms are motile, others are not
+
+-   division
+
+-   non-homogeneous turbulence
+
+-   size

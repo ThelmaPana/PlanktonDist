@@ -1,0 +1,181 @@
+---
+title: "Notes on individual plankton distances"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+editor: visual
+lightbox: true
+---
+
+# Analysis stages
+
+-   Overall randomness
+
+-   Intra-specific
+
+-   Inter-specific
+
+# Importance of this work
+
+-   this scale is the relevant one to understand the ecology of planktonic organisms
+
+[Robinson et al. 2021]{.underline}:
+
+-   spatial heterogeneity in plankton across a wide range of scales
+
+-   ecological importance
+
+-   biological processes are more important at small scale
+
+-   rather unknown
+
+-   fine-scale patchiness important for: fitness, locating mates, finding preys and avoiding predators. Come from theory + lab work.
+
+-   mean background density does not represent the actual environment experienced by an individual -\> importance to go at smaller scales
+
+[Benoit-Bird et al. 2013]{.underline}:
+
+-   aggregations of plankton are vertically compressed (\< 5 m in vertical)
+
+-   signature of:  physical, chemical and biological processes
+
+[Haury et al. 1987]{.underline}:
+
+-   aggregation / patches on a wide variety of space and time scales, including for plankton
+
+-   general phenomenon:  ecological and evolutionary importance
+
+-   investigate deviation from random expectation as a 1st step
+
+-   at the species / individual level, we can investigate
+
+    -   inter and intra species competitions
+
+    -   niche partitioning
+
+    -   relationship to environmental parameters
+
+-   micro-scale = 1 cm to 1 m
+
+-   see: Bainbridge, 1952; Cassie, 1959; Owen,1966; Emery, 1968; [Clutter, 1969]{.underline}, [Anraku 1975]{.underline}
+
+[Levin 1992]{.underline}
+
+# Feeding strategies
+
+## Acantharea
+
+**Mixotrophic**
+
+-   Decelle et al. 2013: Acantharia are known to ingest a wide range of prey, such as bacteria, microalgae and even zooplankton
+
+-   Swanberg and Caron, 1991: diatoms, eggs, protists, copepods, mollusc larvae, Acantharia
+
+-   Decelle 2015: mostly grazers, some species are mixotrophic (the case for our species)
+
+-   Suzuki 2015: mostly unknown, same as predators
+
+## Actinopterygii
+
+## Annelida
+
+-   Nival et al. 2019: Carnivorous
+
+Poorly studied.
+
+## Appendicularia
+
+## Aulacanthidae
+
+## Chaetognatha
+
+Ambush predators, mostly eat cladoceran and copepods, but also amphipods, krill and fish larvae. Feed also on younger chaetognaths. Some species are omnivores (in the Arctic).
+
+-   Pearre 1981
+
+-   Kruse 2018: copepods is the principal prey. Preyed-on by amphipods and fish.
+
+-   Sullivan 1980: large variety of prey size, but prefer cyclopoid copepods (juveniles chaetognaths)
+
+## Collodaria_colonial
+
+**Mixotrophic**
+
+-   Decelle et al. 2012: Broad range of preys, including copepods, ciliates, phytoplankton (also Swanberg and Caron 1991)
+
+## Collodaria_solitaryblack
+
+**Mixotrophic**
+
+Same as above.
+
+## Cop_Calanoida
+
+## Cop_Calanus
+
+## Cop_Euchaeta
+
+## Cop_Euchaeta_juv
+
+## Cop_Harpacticoida
+
+## Cop_Heterorhabdus
+
+## Cop_ogiverous
+
+## Cop_Oithona
+
+Omnivorous.
+
+## Cop_other
+
+Unpsecified, likely omnivorous.
+
+## Cop_Pleuromamma
+
+## Cop_small
+
+## Crustacea_other
+
+Unpsecified, likely carnivorous.
+
+## Ctenophora
+
+-   Haddock 2007: deploy their two tentacles to catch preys, e.g. Copepoda. Carnivorous.
+
+## Doliolida
+
+-   Conley et al. 2008: filter-feeder using mucous meshes.
+
+-   Clerc at al. 2023: various preys. Represented as non-selective feeders.
+
+-   Walters et al. 2018: wild-caught *Dolioletta gegenbauri*: Radiolaria, protists, chaetognaths, molluscs, copepods and Cnidaria
+
+Preyed on by Sapphirina.
+
+## Eumalacostraca
+
+Likely carnivorous.
+
+## Hydrozoa
+
+## Mollusca
+
+Mostly pteropods, filter-feeders using mucous nets.
+
+## Pyrocystis
+
+## Rhizaria
+
+-   Swanberg and Caron, 1991: diatoms, eggs, protists, copepods, mollusc larvae, Acantharia, Rhizaria
+
+## Scyphozoa_ephyra
+
+Carnivorous
+
+## Siphonophorae
+
+-   Nival et al. 2019: predators of meso-zooplankton, ambush predator.
+
+# Building the network
