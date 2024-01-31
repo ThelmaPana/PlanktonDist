@@ -20,6 +20,7 @@ source("utils.R")
 Subsample data (only performed once).
 
 ```{r read}
+#| cache.lazy: True
 ## All data
 images <- read_parquet("data/00.images_clean.parquet")
 plankton <- read_parquet("data/00.plankton_clean.parquet")
@@ -119,11 +120,4 @@ dist_all <- do.call(bind_rows, dist_all)
 ggplot(dist_all) + 
   geom_density(aes(x = value, colour = img_name), linewidth = 0.02, show.legend = F) +
   geom_density(aes(x = value))
-```
-
-```{r norm}
-#| eval: false
-ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
-  stat_function(fun = dnorm) +
-  theme_void()
 ```

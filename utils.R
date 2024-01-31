@@ -32,6 +32,7 @@ suppressWarnings(library(ggpubr))
 suppressWarnings(library(patchwork))
 suppressWarnings(library(cmocean))
 suppressWarnings(library(scales))
+suppressWarnings(library(ggtext))
 
 
 theme_set(theme_minimal())

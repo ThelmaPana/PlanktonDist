@@ -222,3 +222,105 @@ The dataset has a few drawbacks that need to be accounted for:
 -   non-homogeneous turbulence
 
 -   size
+
+## Steps of analyses
+
+### Null hypothesis
+
+```{r norm}
+#| eval: false
+ggplot(data.frame(x = c(0, 10)), aes(x = x)) +
+  stat_function(fun = dnorm, args = list(mean = 5, sd = 1), aes(colour = "Null")) +
+  labs(x = "d", y = "p") +
+  scale_colour_manual("", values = c("Null" = "black")) +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+```
+
+### Distances between all organisms
+
+Null hypothesis + all distances.
+
+```{r all}
+ggplot(data.frame(x = c(0:10)), aes(x = x)) +
+  stat_function(fun = dnorm, args = list(mean = 5, sd = 1), aes(colour = "Null")) +
+  stat_function(fun = dgamma, args = list(shape = 5, rate = 1.9), aes(colour = "All")) +
+  scale_colour_manual("", values = c("Null" = "black", "All" = "red")) +
+  labs(x = "d", y = "p") +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+```
+
+If distances between all organisms has a distribution that differs from the null hypothesis, then planktonic organisms are not randomly distributed.
+
+### Intraspecific
+
+Let’s label our planktonic organisms `i`, `j`, `k`… Plot intraspecific distances for all groups (`dii`, `djj`…).
+
+```{r intra}
+ggplot(data.frame(x = c(0:10)), aes(x = x)) +
+  stat_function(fun = dnorm, args = list(mean = 5, sd = 1), aes(colour = "Null")) +
+  stat_function(fun = dgamma, args = list(shape = 5, rate = 1.9), aes(colour = "All")) +
+  stat_function(fun = dgamma, args = list(shape = 6, rate = 2), aes(colour = "d<sub>ii</sub>")) +
+  scale_colour_manual("", values = c(
+    "Null" = "black", 
+    "All" = "red", 
+    "d<sub>ii</sub>" = "dodgerblue"
+  )) +
+  labs(x = "d", y = "p") +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), legend.text = element_markdown())
+```
+
+This should reveal the presence/absence of intraspecific interactions:
+
+-   if `dii` = `Null`, then random distribution for group `i`, i.e. no interactions
+
+-   if `dii` tends to be larger than `Null` distribution, then organisms of group `i` are more spaced out than at random. Better repartition of resources if resources are evenly distributed (this could be investigated within spaces of evenly distributed resources, e.g. chla). IFD?
+
+```{=html}
+<!-- -->
+```
+-   if `dii` tends to be smaller than `Null` distribution, then organisms of group `i` are aggregated. Could reveal an aggregation of resources, or predation in case of canibalism.
+
+### Interspecific
+
+For this, we use pairs of groups `i,j` and compute distances between all organisms of types `i,j` within images (`dij`, `dik`…).
+
+```{r inter}
+ggplot(data.frame(x = c(0:10)), aes(x = x)) +
+  stat_function(fun = dnorm, args = list(mean = 5, sd = 1), aes(colour = "Null")) +
+  stat_function(fun = dgamma, args = list(shape = 5, rate = 1.9), aes(colour = "All")) +
+  stat_function(fun = dgamma, args = list(shape = 6, rate = 2), aes(colour = "d<sub>ii</sub>")) +
+  stat_function(fun = dgamma, args = list(shape = 7, rate = 2.5), aes(colour = "d<sub>ij</sub>")) +
+  stat_function(fun = dgamma, args = list(shape = 3, rate = 1.5), aes(colour = "d<sub>ik</sub>")) +
+  scale_colour_manual("", values = c(
+    "Null" = "black", 
+    "All" = "red", 
+    "d<sub>ii</sub>" = "dodgerblue",
+    "d<sub>ij</sub>" = "darkgreen",
+    "d<sub>ik</sub>" = "lightgreen"
+  )) +
+  labs(x = "d", y = "p") +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), legend.text = element_markdown())
+
+```
+
+This should reveal the presence/absence of interspecific interactions:
+
+-   if `dij` = `Null`, then groups `i` and `j` seem not to interact together
+
+-   if `dij` tends to be larger than `Null`, then groups `i` and `j` are avoiding each other (competition for resources, IFD in case of homogeneous resources)
+
+-   if `dij` tends to be smaller than `Null`, then groups `i` and `j` are closer, which could reveal interactions such as competition for aggregated resources, predation of one on the other.
+
+## Prey VS  predator point of view
+
+Let’s imagine `i` preys on `j`, then
+
+-   in the pov of `i`, it makes sense to get closer to `j`, so that `dij` should be shifted to the left
+
+-   in the pov of `j`, it makes sense to avoid `i`, so that `dij` should be shifted to the right
+
+Which is correct?
