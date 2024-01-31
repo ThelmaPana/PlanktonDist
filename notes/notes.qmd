@@ -18,7 +18,12 @@ lightbox: true
 
 # Importance of this work
 
--   this scale is the relevant one to understand the ecology of planktonic organisms
+-   interactions betwenn planktonic organisms (and their environment) in their immediate vicinity (i.e. a few centimetres) is poorly described _in situ_ because most tools are not adapted to this task
+
+-   this scale is the relevant one to understand the ecology/biology of planktonic organisms
+
+-   some _in situ_ imaging instrument can now allow us to tackle these scales
+
 
 [Robinson et al. 2021]{.underline}:
 
