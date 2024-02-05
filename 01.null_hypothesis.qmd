@@ -17,8 +17,6 @@ execute:
 source("utils.R")
 ```
 
-Subsample data (only performed once).
-
 ```{r read}
 #| cache.lazy: True
 ## All data
@@ -77,30 +75,28 @@ Generate our random data.
 
 ```{r pick_rand}
 # Pick random points within image volumes
-rand_points <- lapply(1:n_img, function(i){
+rand_points <- mclapply(1:n_img, function(i){
   # Number of points to sample within image
   n <- sample$n[i]
   # Draw points
-  toto <- tibble(
+  d_points <- tibble(
     x = runif(n = n, min = 1, max = vol$x),
     y = runif(n = n, min = 1, max = vol$y),
     z = runif(n = n, min = 1, max = vol$z)
   ) %>% # Add information for img name
   mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
-})
+}, mc.cores = n_cores)
 
 # Store this in a df
 rand_points <- do.call(bind_rows, rand_points)
 
-# Save it
-save(rand_points, file = "data/01.null_hypothesis.Rdata")
 ```
 
 Compute and plot distances between all objects within each image.
 
 ```{r rand_dist}
 # Loop over images and compute distances between all points within each image
-dist_all <- lapply(unique(rand_points$img_name), function(name) {
+dist_all_rand <- mclapply(unique(rand_points$img_name), function(name) {
   # Get points within image
   points <- rand_points %>% 
     filter(img_name == name) %>% 
@@ -111,13 +107,20 @@ dist_all <- lapply(unique(rand_points$img_name), function(name) {
     as_tibble() %>% 
     filter(p1 != p2) %>% 
     mutate(img_name = name)
-})
+}, mc.cores = n_cores)
 
 # Combine results in a dataframe
-dist_all <- do.call(bind_rows, dist_all)
+dist_all_rand <- do.call(bind_rows, dist_all_rand) %>% rename(dist = value)
 
 # Plot all
-ggplot(dist_all) + 
-  geom_density(aes(x = value, colour = img_name), linewidth = 0.02, show.legend = F) +
-  geom_density(aes(x = value))
+ggplot(dist_all_rand) + 
+  geom_density(aes(x = dist, colour = img_name), linewidth = 0.02, show.legend = F) +
+  geom_density(aes(x = dist))
+
+# Plot all
+ggplot(dist_all_rand) + 
+  geom_density(aes(x = dist))
+
+# Save it
+save(dist_all_rand, file = "data/01.null_data.Rdata")
 ```

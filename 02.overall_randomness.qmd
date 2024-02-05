@@ -1,5 +1,5 @@
 ---
-title: "Generate random data for our null hypothesis"
+title: "Test for overall randomness of plankton distribution"
 author: "Thelma Panaïotis"
 format: 
   html:
@@ -17,21 +17,21 @@ execute:
 source("utils.R")
 ```
 
-Subsample data (only performed once).
-
 ```{r read}
 
 ## All data
-images <- read_parquet("data/00.images_clean.parquet")
-plankton <- read_parquet("data/00.plankton_clean.parquet")
+images <- read_parquet(here("data/00.images_clean.parquet"))
+plankton <- read_parquet(here("data/00.plankton_clean.parquet"))
 
 ## Subsample
-#load("data/00.subsample.Rdata")
-#plankton <- plankton_sub
-#images <- images_sub
+images <- images %>% slice_sample(n = 1000)
+plankton <- plankton %>% filter(img_name %in% images$img_name)
 
 # list img names
 img_names <- sort(unique(images$img_name))
+
+## Null hypothesis data
+load(here("data/01.null_data.Rdata"))
 ```
 
 Define window size for point pattern analysis.
@@ -44,13 +44,13 @@ vol$y <- 2048
 vol$z <- 9572
 ```
 
-## Overall randomness
+## Distances between all organisms
 
 To investigate overall randomness, let’s compute distances between all pairs of organisms within an image.
 
 ```{r all_dist}
 # Loop over images and compute distances between all points within each image
-dist_all <- lapply(img_names, function(name) {
+dist_all <- mclapply(img_names, function(name) {
   # Get points within image
   points <- plankton %>% 
     filter(img_name == name) %>% 
@@ -62,7 +62,7 @@ dist_all <- lapply(img_names, function(name) {
     filter(p1 != p2) %>% 
     rename(dist = value) %>% 
     mutate(img_name = name)
-})
+}, mc.cores = n_cores)
 
 # Combine results in a dataframe
 dist_all <- do.call(bind_rows, dist_all)
@@ -71,15 +71,36 @@ dist_all <- do.call(bind_rows, dist_all)
 ggplot(dist_all) + 
   geom_density(aes(x = dist, colour = img_name), linewidth = 0.1, show.legend = F) +
   geom_density(aes(x = dist))
+
+ggplot(dist_all) + 
+  geom_density(aes(x = dist))
 ```
 
-## Intra-specific
+## Compare with null data using Kuiper test
 
-## Inter-specific
+Plot ECDF for null distances and all data. Subsample to 10000 points for computations.
 
-```{r norm}
-#| eval: false
-ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
-  stat_function(fun = dnorm) +
-  theme_void()
+```{r plot_ecdf}
+bind_rows(
+  dist_all %>% select(dist) %>% mutate(data = "all"),
+  dist_all_rand %>% select(dist) %>% mutate(data = "null")
+) %>% 
+  slice_sample(n = 10000) %>% 
+  ggplot(aes(dist, colour = data)) +
+  stat_ecdf(geom = "step")
+```
+
+This looks very similar…
+
+Perform Kuiper test on a subsample
+
+```{r compare}
+s1 <-  sample(dist_all$dist, size = 10000)
+s2 <-  sample(dist_all_rand$dist, size = 10000)
+out <-  kuiper_test(s1, s2)
+out
+summary(out)
+plot(out)
+
+
 ```

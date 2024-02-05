@@ -6,6 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Thelma Panaïotis">
 
 <title>Dataset presentation</title>
 <style>
@@ -100,6 +101,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#non-biological" id="toc-non-biological" class="nav-link" data-scroll-target="#non-biological">Non biological</a></li>
   <li><a href="#biological" id="toc-biological" class="nav-link" data-scroll-target="#biological">Biological</a></li>
   </ul></li>
+  <li><a href="#steps-of-analyses" id="toc-steps-of-analyses" class="nav-link" data-scroll-target="#steps-of-analyses">Steps of analyses</a>
+  <ul class="collapse">
+  <li><a href="#null-hypothesis" id="toc-null-hypothesis" class="nav-link" data-scroll-target="#null-hypothesis">Null hypothesis</a></li>
+  <li><a href="#distances-between-all-organisms" id="toc-distances-between-all-organisms" class="nav-link" data-scroll-target="#distances-between-all-organisms">Distances between all organisms</a></li>
+  <li><a href="#intraspecific" id="toc-intraspecific" class="nav-link" data-scroll-target="#intraspecific">Intraspecific</a></li>
+  <li><a href="#interspecific" id="toc-interspecific" class="nav-link" data-scroll-target="#interspecific">Interspecific</a></li>
+  </ul></li>
+  <li><a href="#prey-vs-predator-point-of-view" id="toc-prey-vs-predator-point-of-view" class="nav-link" data-scroll-target="#prey-vs-predator-point-of-view">Prey VS  predator point of view</a></li>
   </ul>
 </nav>
 </div>
@@ -114,6 +123,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <div class="quarto-title-meta">
 
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Thelma Panaïotis </p>
+          </div>
+  </div>
     
   
     
@@ -124,25 +139,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>images <span class="ot">&lt;-</span> <span class="fu">read_parquet</span>(<span class="fu">file.path</span>(data_dir, <span class="st">"raw/predicted_images.parquet"</span>))</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>plankton <span class="ot">&lt;-</span> <span class="fu">read_parquet</span>(<span class="fu">file.path</span>(data_dir, <span class="st">"raw/plankton_predictions.parquet"</span>))</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>cops <span class="ot">&lt;-</span> <span class="fu">read_parquet</span>(<span class="fu">file.path</span>(data_dir, <span class="st">"raw/copepods.parquet"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
 <section id="instrument-overview" class="level2">
 <h2 class="anchored" data-anchor-id="instrument-overview">Instrument overview</h2>
-<p>ISIIS is towed in the water between 0 and 100 metres in a sawtooth like pattern, sampling ~100 L s⁻¹. ISIIS captures <strong>frames</strong> within a field of view of 10.5 × 10.5 × 50 cm (H × W × D). These frames are 2048 × 2048 px.</p>
+<p>ISIIS: In Situ Ichthyoplankton Imaging System</p>
+<ul>
+<li><p>organisms in 250 µm - 10 cm</p></li>
+<li><p>sampling rate &gt; 100 L s⁻¹</p></li>
+<li><p>shadowgraphy</p></li>
+<li><p>line scan camera</p></li>
+<li><p>towed + yos</p></li>
+</ul>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="images/vlcsnap-2024-01-17-11h47m14s896.png" class="lightbox" data-glightbox="description: .lightbox-desc-1" data-gallery="quarto-lightbox-gallery-1" title="ISIIS frame, before rotation, flat fielding and equalisation."><img src="images/vlcsnap-2024-01-17-11h47m14s896.png" class="img-fluid figure-img" alt="ISIIS frame, before rotation, flat fielding and equalisation."></a></p>
+<p><a href="images/Isiis_schematic.png" class="lightbox" data-glightbox="description: .lightbox-desc-1" data-gallery="quarto-lightbox-gallery-1" title="ISIIS light scheme"><img src="images/Isiis_schematic.png" class="img-fluid figure-img" alt="ISIIS light scheme"></a></p>
+<figcaption>ISIIS light scheme</figcaption>
+</figure>
+</div>
+<p>ISIIS captures <strong>frames</strong> within a field of view of 10.5 × 10.5 × 50 cm (H × W × D). These frames are 2048 × 2048 px.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="images/vlcsnap-2024-01-17-11h47m14s896.png" class="lightbox" data-glightbox="description: .lightbox-desc-2" data-gallery="quarto-lightbox-gallery-2" title="ISIIS frame, before rotation, flat fielding and equalisation."><img src="images/vlcsnap-2024-01-17-11h47m14s896.png" class="img-fluid figure-img" alt="ISIIS frame, before rotation, flat fielding and equalisation."></a></p>
 <figcaption>ISIIS frame, before rotation, flat fielding and equalisation.</figcaption>
 </figure>
 </div>
 <p>Because it uses a line-scan camera and it is towed at ~constant speed, frames can be assembled together to recreate a continuous ribbon. For processing purposes (flat-fielding, segmentation…), 5 consecutive frames are assembled together to create an “<strong>image</strong>” of size 2048 × 10240 px.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="images/2013-07-23_21-50-20_038699.png" class="lightbox" data-glightbox="description: .lightbox-desc-2" data-gallery="quarto-lightbox-gallery-2" title="ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation."><img src="images/2013-07-23_21-50-20_038699.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation."></a></p>
-<figcaption>ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation.</figcaption>
+<p><a href="images/2013-07-23_21-50-20_038699.png" class="lightbox" data-glightbox="description: .lightbox-desc-3" data-gallery="quarto-lightbox-gallery-3" title="An ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation."><img src="images/2013-07-23_21-50-20_038699.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="An ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation."></a></p>
+<figcaption>An ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation.</figcaption>
 </figure>
 </div>
 <p>See <a href="https://www.sciencedirect.com/science/article/abs/pii/S2211122015300177">Faillettaz et al.&nbsp;2016</a> for more details.</p>
@@ -156,43 +180,42 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>First, let’s keep only images in which plankton is present.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>images <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> <span class="fu">filter</span>(img_name <span class="sc">%in%</span> <span class="fu">unique</span>(plankton<span class="sc">$</span>img_name))</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># List taxa</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>taxa <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">pull</span>(taxon) <span class="sc">%&gt;%</span> <span class="fu">unique</span>() <span class="sc">%&gt;%</span> <span class="fu">sort</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>images <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> <span class="fu">filter</span>(img_name <span class="sc">%in%</span> <span class="fu">unique</span>(plankton<span class="sc">$</span>img_name))</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># List taxa</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>taxa <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">pull</span>(taxon) <span class="sc">%&gt;%</span> <span class="fu">unique</span>() <span class="sc">%&gt;%</span> <span class="fu">sort</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The dataset consists of 18,892,593 identified plankton organsims belonging to 23 taxonomic groups, distributed within 625,561. Each image is 2048 × 10,240 px, representing 52.5 × 10.5 cm.</p>
+<p>The dataset consists of 17,980,741 identified plankton organsims belonging to 23 taxonomic groups, distributed within 625,561. Each image is 2048 × 10,240 px, representing 52.5 × 10.5 cm.</p>
 <section id="have-a-look-at-one-image" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="have-a-look-at-one-image">Have a look at one image</h3>
 <p>Now let’s check what the data looks like for a given image.</p>
 <div class="cell page-columns page-full">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Choose an image</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>my_img <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> <span class="fu">filter</span>(keep) <span class="sc">%&gt;%</span> <span class="fu">sample_n</span>(<span class="dv">1</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(img_name)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Select objects within this image</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">filter</span>(img_name <span class="sc">==</span> my_img)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep relevant information</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span> </span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(transect, img_name, taxon, id, centroid_0, centroid_1) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> centroid_1 <span class="sc">+</span> <span class="dv">1</span>, <span class="co"># need to add 1 because Python indexing starts at 0</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> centroid_0 <span class="sc">+</span> <span class="dv">1</span>, <span class="co"># need to add 1 because Python indexing starts at 0</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">contains</span>(<span class="st">"centroid"</span>))</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot organisms position within image</span></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>df <span class="sc">%&gt;%</span> </span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> x, <span class="at">y =</span> y, <span class="at">colour =</span> taxon)) <span class="sc">+</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span> <span class="fu">scale_y_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_fixed</span>() <span class="sc">+</span></span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Choose an image</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>my_img <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> <span class="fu">filter</span>(keep) <span class="sc">%&gt;%</span> <span class="fu">sample_n</span>(<span class="dv">1</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(img_name)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Select objects within this image</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">filter</span>(img_name <span class="sc">==</span> my_img)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep relevant information</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span> </span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(transect, img_name, taxon, object_id, centroid_0, centroid_1) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> centroid_1 <span class="sc">+</span> <span class="dv">1</span>, <span class="co"># need to add 1 because Python indexing starts at 0</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> centroid_0 <span class="sc">+</span> <span class="dv">1</span>, <span class="co"># need to add 1 because Python indexing starts at 0</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">contains</span>(<span class="st">"centroid"</span>))</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot organisms position within image</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>df <span class="sc">%&gt;%</span> </span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> x, <span class="at">y =</span> y, <span class="at">colour =</span> taxon)) <span class="sc">+</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span> <span class="fu">scale_y_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_fixed</span>() <span class="sc">+</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display page-columns page-full">
 <div class="page-columns page-full">
 <figure class="figure page-columns page-full">
-<p class="page-columns page-full"><a href="dataset_presentation_files/figure-html/plot_one_image-1.png" class="lightbox page-columns page-full" data-gallery="quarto-lightbox-gallery-3"><img src="dataset_presentation_files/figure-html/plot_one_image-1.png" class="img-fluid figure-img column-screen-inset" style="width:100.0%"></a></p>
+<p class="page-columns page-full"><a href="dataset_presentation_files/figure-html/plot_one_image-1.png" class="lightbox page-columns page-full" data-gallery="quarto-lightbox-gallery-4"><img src="dataset_presentation_files/figure-html/plot_one_image-1.png" class="img-fluid figure-img column-screen-inset" style="width:100.0%"></a></p>
 </figure>
 </div>
 </div>
@@ -215,19 +238,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="number-of-organisms-per-image" class="level3">
 <h3 class="anchored" data-anchor-id="number-of-organisms-per-image">Number of organisms per image</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>pl_per_img <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">count</span>(img_name)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pl_per_img<span class="sc">$</span>n)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>pl_per_img <span class="ot">&lt;-</span> plankton <span class="sc">%&gt;%</span> <span class="fu">count</span>(img_name)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pl_per_img<span class="sc">$</span>n)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-    1.0    12.0    21.0    30.2    40.0   550.0 </code></pre>
+    2.0    11.0    20.0    28.9    38.0   547.0 </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pl_per_img) <span class="sc">+</span> </span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="fu">aes</span>(<span class="at">x =</span> n), <span class="at">bins =</span> <span class="dv">200</span>) <span class="sc">+</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_log10</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pl_per_img) <span class="sc">+</span> </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="fu">aes</span>(<span class="at">x =</span> n), <span class="at">bins =</span> <span class="dv">200</span>) <span class="sc">+</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_log10</span>() <span class="sc">+</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Organisms per image"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><a href="dataset_presentation_files/figure-html/nb_org-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4"><img src="dataset_presentation_files/figure-html/nb_org-1.png" class="img-fluid figure-img" width="672"></a></p>
+<p><a href="dataset_presentation_files/figure-html/nb_org-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5"><img src="dataset_presentation_files/figure-html/nb_org-1.png" class="img-fluid figure-img" width="672"></a></p>
 </figure>
 </div>
 </div>
@@ -236,17 +260,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="taxonomy" class="level3">
 <h3 class="anchored" data-anchor-id="taxonomy">Taxonomy</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plankton <span class="sc">%&gt;%</span> </span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(taxon) <span class="sc">%&gt;%</span> </span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(n) <span class="sc">%&gt;%</span> </span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">taxon =</span> <span class="fu">fct_inorder</span>(taxon)) <span class="sc">%&gt;%</span> </span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="fu">aes</span>(<span class="at">x =</span> n, <span class="at">y =</span> taxon)) <span class="sc">+</span> </span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plankton <span class="sc">%&gt;%</span> </span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(taxon) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(n) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">taxon =</span> <span class="fu">fct_inorder</span>(taxon)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="fu">aes</span>(<span class="at">x =</span> n, <span class="at">y =</span> taxon)) <span class="sc">+</span> </span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><a href="dataset_presentation_files/figure-html/taxo_comp-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5"><img src="dataset_presentation_files/figure-html/taxo_comp-1.png" class="img-fluid figure-img" width="672"></a></p>
+<p><a href="dataset_presentation_files/figure-html/taxo_comp-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6"><img src="dataset_presentation_files/figure-html/taxo_comp-1.png" class="img-fluid figure-img" width="672"></a></p>
 </figure>
 </div>
 </div>
@@ -268,28 +292,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="map" class="level3">
 <h3 class="anchored" data-anchor-id="map">Map</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>camp <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> </span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    transect, img_name, </span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    lon, lat, datetime, dist, depth,</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    yo, yo_type, period,</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    temp<span class="sc">:</span>dens</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>camp <span class="sc">%&gt;%</span> </span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(transect, yo) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="dv">1</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">transect_type =</span> <span class="fu">str_split_fixed</span>(transect, <span class="st">"_"</span>, <span class="at">n =</span> <span class="dv">2</span>)[,<span class="dv">1</span>], <span class="at">.after =</span> transect) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> lon, <span class="at">y =</span> lat)) <span class="sc">+</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_path</span>(<span class="fu">aes</span>(<span class="at">group =</span> transect, <span class="at">colour =</span> transect_type)) <span class="sc">+</span></span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">data =</span> coast, <span class="at">fill =</span> <span class="st">"gray"</span>) <span class="sc">+</span></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Longitude"</span>, <span class="at">y =</span> <span class="st">"Latitude"</span>, <span class="at">colour =</span> <span class="st">"Transect</span><span class="sc">\n</span><span class="st">type"</span>) <span class="sc">+</span></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>(<span class="at">expand =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>camp <span class="ot">&lt;-</span> images <span class="sc">%&gt;%</span> </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    transect, img_name, </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    lon, lat, datetime, dist, depth,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    yo, yo_type, period,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    temp<span class="sc">:</span>dens</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>camp <span class="sc">%&gt;%</span> </span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(transect, yo) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="dv">1</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">transect_type =</span> <span class="fu">str_split_fixed</span>(transect, <span class="st">"_"</span>, <span class="at">n =</span> <span class="dv">2</span>)[,<span class="dv">1</span>], <span class="at">.after =</span> transect) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> lon, <span class="at">y =</span> lat)) <span class="sc">+</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_path</span>(<span class="fu">aes</span>(<span class="at">group =</span> transect, <span class="at">colour =</span> transect_type)) <span class="sc">+</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">data =</span> coast, <span class="at">fill =</span> <span class="st">"gray"</span>) <span class="sc">+</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Longitude"</span>, <span class="at">y =</span> <span class="st">"Latitude"</span>, <span class="at">colour =</span> <span class="st">"Transect</span><span class="sc">\n</span><span class="st">type"</span>) <span class="sc">+</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>(<span class="at">expand =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><a href="dataset_presentation_files/figure-html/camp_map-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6"><img src="dataset_presentation_files/figure-html/camp_map-1.png" class="img-fluid figure-img" width="672"></a></p>
+<p><a href="dataset_presentation_files/figure-html/camp_map-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7"><img src="dataset_presentation_files/figure-html/camp_map-1.png" class="img-fluid figure-img" width="672"></a></p>
 </figure>
 </div>
 </div>
@@ -298,39 +322,39 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="time" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="time">Time</h3>
 <div class="cell page-columns page-full">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Nice color palette</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>cols <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"dawn"</span> <span class="ot">=</span> <span class="st">"#fc8d62"</span>, </span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"day"</span> <span class="ot">=</span> <span class="st">"#80b1d3"</span>, </span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"dusk"</span> <span class="ot">=</span> <span class="st">"#df65b0"</span>, </span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"night"</span> <span class="ot">=</span> <span class="st">"#022660"</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Get beginning and end of each transect</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>transect_times <span class="ot">&lt;-</span> camp <span class="sc">%&gt;%</span> </span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(transect) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="fu">c</span>(<span class="dv">1</span>,<span class="fu">n</span>())) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(transect, datetime, period)</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>transect_times <span class="sc">%&gt;%</span> </span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_path</span>(<span class="fu">aes</span>(<span class="at">x =</span> datetime, <span class="at">y =</span> transect, <span class="at">group =</span> transect, <span class="at">colour =</span> period), <span class="at">linewidth =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="at">values =</span> cols) <span class="sc">+</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_datetime</span>(</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">date_breaks =</span> <span class="st">"12 hours"</span>, </span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>),</span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">label_date_short</span>(<span class="at">format =</span> <span class="fu">c</span>(<span class="st">""</span>,<span class="st">""</span>, <span class="st">"%m/%d"</span>, <span class="st">"%H:%M"</span>), <span class="at">sep =</span> <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>),</span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(</span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>      <span class="fu">floor_date</span>(<span class="fu">min</span>(transect_times<span class="sc">$</span>datetime), <span class="at">unit =</span> <span class="st">"day"</span>), </span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>      <span class="fu">ceiling_date</span>(<span class="fu">max</span>(transect_times<span class="sc">$</span>datetime), <span class="at">unit =</span> <span class="st">"day"</span>)</span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Datetime (CEST)"</span>, <span class="at">y =</span> <span class="st">"Transect"</span>, <span class="at">color =</span> <span class="st">"Period"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Nice color palette</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>cols <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"dawn"</span> <span class="ot">=</span> <span class="st">"#fc8d62"</span>, </span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"day"</span> <span class="ot">=</span> <span class="st">"#80b1d3"</span>, </span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"dusk"</span> <span class="ot">=</span> <span class="st">"#df65b0"</span>, </span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"night"</span> <span class="ot">=</span> <span class="st">"#022660"</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Get beginning and end of each transect</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>transect_times <span class="ot">&lt;-</span> camp <span class="sc">%&gt;%</span> </span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(transect) <span class="sc">%&gt;%</span> </span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="fu">c</span>(<span class="dv">1</span>,<span class="fu">n</span>())) <span class="sc">%&gt;%</span> </span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(transect, datetime, period)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>transect_times <span class="sc">%&gt;%</span> </span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_path</span>(<span class="fu">aes</span>(<span class="at">x =</span> datetime, <span class="at">y =</span> transect, <span class="at">group =</span> transect, <span class="at">colour =</span> period), <span class="at">linewidth =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="at">values =</span> cols) <span class="sc">+</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_datetime</span>(</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">date_breaks =</span> <span class="st">"12 hours"</span>, </span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>),</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">label_date_short</span>(<span class="at">format =</span> <span class="fu">c</span>(<span class="st">""</span>,<span class="st">""</span>, <span class="st">"%m/%d"</span>, <span class="st">"%H:%M"</span>), <span class="at">sep =</span> <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>),</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>      <span class="fu">floor_date</span>(<span class="fu">min</span>(transect_times<span class="sc">$</span>datetime), <span class="at">unit =</span> <span class="st">"day"</span>), </span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>      <span class="fu">ceiling_date</span>(<span class="fu">max</span>(transect_times<span class="sc">$</span>datetime), <span class="at">unit =</span> <span class="st">"day"</span>)</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Datetime (CEST)"</span>, <span class="at">y =</span> <span class="st">"Transect"</span>, <span class="at">color =</span> <span class="st">"Period"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display page-columns page-full">
 <div class="page-columns page-full">
 <figure class="figure page-columns page-full">
-<p class="page-columns page-full"><a href="dataset_presentation_files/figure-html/camp_time-1.png" class="lightbox page-columns page-full" data-gallery="quarto-lightbox-gallery-7"><img src="dataset_presentation_files/figure-html/camp_time-1.png" class="img-fluid figure-img column-screen-inset" style="width:100.0%"></a></p>
+<p class="page-columns page-full"><a href="dataset_presentation_files/figure-html/camp_time-1.png" class="lightbox page-columns page-full" data-gallery="quarto-lightbox-gallery-8"><img src="dataset_presentation_files/figure-html/camp_time-1.png" class="img-fluid figure-img column-screen-inset" style="width:100.0%"></a></p>
 </figure>
 </div>
 </div>
@@ -340,7 +364,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="environmental-data">Environmental data</h3>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="images/env_data.png" class="lightbox" data-glightbox="description: .lightbox-desc-8" data-gallery="quarto-lightbox-gallery-8" title="Environmental conditions during one of the cross-current transects."><img src="images/env_data.png" class="img-fluid figure-img" alt="Environmental conditions during one of the cross-current transects."></a></p>
+<p><a href="images/env_data.png" class="lightbox" data-glightbox="description: .lightbox-desc-9" data-gallery="quarto-lightbox-gallery-9" title="Environmental conditions during one of the cross-current transects."><img src="images/env_data.png" class="img-fluid figure-img" alt="Environmental conditions during one of the cross-current transects."></a></p>
 <figcaption>Environmental conditions during one of the cross-current transects.</figcaption>
 </figure>
 </div>
@@ -367,12 +391,134 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><p>non-homogeneous turbulence</p></li>
 <li><p>size</p></li>
 </ul>
-<div class="hidden" aria-hidden="true">
-<span class="glightbox-desc lightbox-desc-1">ISIIS frame, before rotation, flat fielding and equalisation.</span>
-<span class="glightbox-desc lightbox-desc-2">ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation.</span>
-<span class="glightbox-desc lightbox-desc-8">Environmental conditions during one of the cross-current transects.</span>
+</section>
+</section>
+<section id="steps-of-analyses" class="level2">
+<h2 class="anchored" data-anchor-id="steps-of-analyses">Steps of analyses</h2>
+<section id="null-hypothesis" class="level3">
+<h3 class="anchored" data-anchor-id="null-hypothesis">Null hypothesis</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">10</span>)), <span class="fu">aes</span>(<span class="at">x =</span> x)) <span class="sc">+</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dnorm, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">5</span>, <span class="at">sd =</span> <span class="dv">1</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"Null"</span>)) <span class="sc">+</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"d"</span>, <span class="at">y =</span> <span class="st">"p"</span>) <span class="sc">+</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="st">""</span>, <span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Null"</span> <span class="ot">=</span> <span class="st">"black"</span>)) <span class="sc">+</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text =</span> <span class="fu">element_blank</span>(), <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><a href="dataset_presentation_files/figure-html/norm-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10"><img src="dataset_presentation_files/figure-html/norm-1.png" class="img-fluid figure-img" width="672"></a></p>
+</figure>
+</div>
+</div>
 </div>
 </section>
+<section id="distances-between-all-organisms" class="level3">
+<h3 class="anchored" data-anchor-id="distances-between-all-organisms">Distances between all organisms</h3>
+<p>Null hypothesis + all distances.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">c</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">10</span>)), <span class="fu">aes</span>(<span class="at">x =</span> x)) <span class="sc">+</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dnorm, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">5</span>, <span class="at">sd =</span> <span class="dv">1</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"Null"</span>)) <span class="sc">+</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">5</span>, <span class="at">rate =</span> <span class="fl">1.9</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"All"</span>)) <span class="sc">+</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="st">""</span>, <span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Null"</span> <span class="ot">=</span> <span class="st">"black"</span>, <span class="st">"All"</span> <span class="ot">=</span> <span class="st">"red"</span>)) <span class="sc">+</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"d"</span>, <span class="at">y =</span> <span class="st">"p"</span>) <span class="sc">+</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text =</span> <span class="fu">element_blank</span>(), <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><a href="dataset_presentation_files/figure-html/all-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-11"><img src="dataset_presentation_files/figure-html/all-1.png" class="img-fluid figure-img" width="672"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<p>If distances between all organisms has a distribution that differs from the null hypothesis, then planktonic organisms are not randomly distributed.</p>
+<p>Other way to test for overall randomness: draw quadrats of equal size in images, there should be the ~same number of organisms in each quadrat (for a given concentration, i.e.&nbsp;not necessarily across images).</p>
+</section>
+<section id="intraspecific" class="level3">
+<h3 class="anchored" data-anchor-id="intraspecific">Intraspecific</h3>
+<p>Let’s label our planktonic organisms <code>i</code>, <code>j</code>, <code>k</code>… Plot intraspecific distances for all groups (<code>dii</code>, <code>djj</code>…).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">c</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">10</span>)), <span class="fu">aes</span>(<span class="at">x =</span> x)) <span class="sc">+</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dnorm, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">5</span>, <span class="at">sd =</span> <span class="dv">1</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"Null"</span>)) <span class="sc">+</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">5</span>, <span class="at">rate =</span> <span class="fl">1.9</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"All"</span>)) <span class="sc">+</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">6</span>, <span class="at">rate =</span> <span class="dv">2</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"d&lt;sub&gt;ii&lt;/sub&gt;"</span>)) <span class="sc">+</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="st">""</span>, <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Null"</span> <span class="ot">=</span> <span class="st">"black"</span>, </span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"All"</span> <span class="ot">=</span> <span class="st">"red"</span>, </span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d&lt;sub&gt;ii&lt;/sub&gt;"</span> <span class="ot">=</span> <span class="st">"dodgerblue"</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">+</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"d"</span>, <span class="at">y =</span> <span class="st">"p"</span>) <span class="sc">+</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text =</span> <span class="fu">element_blank</span>(), <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(), <span class="at">legend.text =</span> ggtext<span class="sc">::</span><span class="fu">element_markdown</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><a href="dataset_presentation_files/figure-html/intra-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-12"><img src="dataset_presentation_files/figure-html/intra-1.png" class="img-fluid figure-img" width="672"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This should reveal the presence/absence of intraspecific interactions:</p>
+<ul>
+<li><p>if <code>dii</code> = <code>Null</code>, then random distribution for group <code>i</code>, i.e.&nbsp;no interactions</p></li>
+<li><p>if <code>dii</code> tends to be larger than <code>Null</code> distribution, then organisms of group <code>i</code> are more spaced out than at random. Better repartition of resources if resources are evenly distributed (this could be investigated within spaces of evenly distributed resources, e.g.&nbsp;chla). IFD?</p></li>
+</ul>
+<!-- -->
+<ul>
+<li>if <code>dii</code> tends to be smaller than <code>Null</code> distribution, then organisms of group <code>i</code> are aggregated. Could reveal an aggregation of resources, or predation in case of canibalism.</li>
+</ul>
+</section>
+<section id="interspecific" class="level3">
+<h3 class="anchored" data-anchor-id="interspecific">Interspecific</h3>
+<p>For this, we use pairs of groups <code>i,j</code> and compute distances between all organisms of types <code>i,j</code> within images (<code>dij</code>, <code>dik</code>…).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">c</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">10</span>)), <span class="fu">aes</span>(<span class="at">x =</span> x)) <span class="sc">+</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dnorm, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="dv">5</span>, <span class="at">sd =</span> <span class="dv">1</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"Null"</span>)) <span class="sc">+</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">5</span>, <span class="at">rate =</span> <span class="fl">1.9</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"All"</span>)) <span class="sc">+</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">6</span>, <span class="at">rate =</span> <span class="dv">2</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"d&lt;sub&gt;ii&lt;/sub&gt;"</span>)) <span class="sc">+</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">7</span>, <span class="at">rate =</span> <span class="fl">2.5</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"d&lt;sub&gt;ij&lt;/sub&gt;"</span>)) <span class="sc">+</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_function</span>(<span class="at">fun =</span> dgamma, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">shape =</span> <span class="dv">3</span>, <span class="at">rate =</span> <span class="fl">1.5</span>), <span class="fu">aes</span>(<span class="at">colour =</span> <span class="st">"d&lt;sub&gt;ik&lt;/sub&gt;"</span>)) <span class="sc">+</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="st">""</span>, <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Null"</span> <span class="ot">=</span> <span class="st">"black"</span>, </span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"All"</span> <span class="ot">=</span> <span class="st">"red"</span>, </span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d&lt;sub&gt;ii&lt;/sub&gt;"</span> <span class="ot">=</span> <span class="st">"dodgerblue"</span>,</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d&lt;sub&gt;ij&lt;/sub&gt;"</span> <span class="ot">=</span> <span class="st">"darkgreen"</span>,</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d&lt;sub&gt;ik&lt;/sub&gt;"</span> <span class="ot">=</span> <span class="st">"lightgreen"</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">+</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"d"</span>, <span class="at">y =</span> <span class="st">"p"</span>) <span class="sc">+</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text =</span> <span class="fu">element_blank</span>(), <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(), <span class="at">legend.text =</span> ggtext<span class="sc">::</span><span class="fu">element_markdown</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><a href="dataset_presentation_files/figure-html/inter-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-13"><img src="dataset_presentation_files/figure-html/inter-1.png" class="img-fluid figure-img" width="672"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This should reveal the presence/absence of interspecific interactions:</p>
+<ul>
+<li><p>if <code>dij</code> = <code>Null</code>, then groups <code>i</code> and <code>j</code> seem not to interact together</p></li>
+<li><p>if <code>dij</code> tends to be larger than <code>Null</code>, then groups <code>i</code> and <code>j</code> are avoiding each other (competition for resources, IFD in case of homogeneous resources)</p></li>
+<li><p>if <code>dij</code> tends to be smaller than <code>Null</code>, then groups <code>i</code> and <code>j</code> are closer, which could reveal interactions such as competition for aggregated resources, predation of one on the other.</p></li>
+</ul>
+</section>
+</section>
+<section id="prey-vs-predator-point-of-view" class="level2">
+<h2 class="anchored" data-anchor-id="prey-vs-predator-point-of-view">Prey VS  predator point of view</h2>
+<p>Let’s imagine <code>i</code> preys on <code>j</code>, then</p>
+<ul>
+<li><p>in the pov of <code>i</code>, it makes sense to get closer to <code>j</code>, so that <code>dij</code> should be shifted to the left</p></li>
+<li><p>in the pov of <code>j</code>, it makes sense to avoid <code>i</code>, so that <code>dij</code> should be shifted to the right</p></li>
+</ul>
+<p>Which is correct?</p>
+<div class="hidden" aria-hidden="true">
+<span class="glightbox-desc lightbox-desc-1">ISIIS light scheme</span>
+<span class="glightbox-desc lightbox-desc-2">ISIIS frame, before rotation, flat fielding and equalisation.</span>
+<span class="glightbox-desc lightbox-desc-3">An ISIIS image, i.e.&nbsp;5 consecutive frames, after rotation, flat fielding and equalisation.</span>
+<span class="glightbox-desc lightbox-desc-9">Environmental conditions during one of the cross-current transects.</span>
+</div>
 </section>
 
 </main>
@@ -760,7 +906,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","descPosition":"bottom","selector":".lightbox","closeEffect":"zoom","loop":false});
+<script>var lightboxQuarto = GLightbox({"selector":".lightbox","closeEffect":"zoom","loop":false,"descPosition":"bottom","openEffect":"zoom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;

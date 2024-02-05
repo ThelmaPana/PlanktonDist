@@ -3,9 +3,11 @@
 suppressWarnings(library(tidyverse))
 suppressWarnings(library(here))
 suppressWarnings(library(reshape2))
+suppressWarnings(library(parallel))
 
 # Null hypothesis
 suppressWarnings(library(MASS))
+suppressWarnings(library(twosamples))
 
 # Reading data
 suppressWarnings(library(arrow))
@@ -42,10 +44,13 @@ theme_set(theme_minimal())
 #--------------------------------------------------------------------------#
 data_dir <- here("data")
 
+## Parallel ----
+#--------------------------------------------------------------------------#
+n_cores <- 12
 
 ## Seed ----
 #--------------------------------------------------------------------------#
-seed <- 1
+set.seed(1)
 
 ## Coast data ----
 #--------------------------------------------------------------------------#
