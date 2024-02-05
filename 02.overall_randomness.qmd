@@ -4,6 +4,7 @@ author: "Thelma Panaïotis"
 format: 
   html:
     toc: true
+    embed-resources: true
 editor: visual
 lightbox: true
 execute:

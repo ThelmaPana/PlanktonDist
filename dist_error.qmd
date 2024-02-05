@@ -1,8 +1,10 @@
 ---
 title: "Error in distances from 3D to 2D"
+subtitle: "Investigate whether 2D distances are representative of 3D distances using null hypothesis data."
 format: 
   html:
     toc: true
+    embed-resources: true
 editor: visual
 lightbox: true
 cache: false
@@ -16,13 +18,12 @@ source("utils.R")
 # Read data
 images <- read_parquet("data/00.images_clean.parquet")
 plankton <- read_parquet("data/00.plankton_clean.parquet")
+
+# Read null data
+load("data/01.null_data.Rdata")
 ```
 
-## Start one example image
-
-::: callout-warning
-## Redo with generated null hypothesis data.
-:::
+## Start with one example image
 
 We draw a set of points within the volume of an ISIIS image. This volume is:
 
@@ -33,34 +34,28 @@ We draw a set of points within the volume of an ISIIS image. This volume is:
 -   50 cm depth ≈ 9752 px (`z` dimension, compressed in images).
 
 ```{r}
-# points per img (common for ISIIS data)
-n_pt <- 20
-# number of images
-n_img <- 1
-
 # image volume
 vol <- c()
 vol$x <- 10240
 vol$y <- 2048
 vol$z <- 9572
-
 ```
 
-Generate the set and plot it in 2D.
+Null data has been generated:
+
+-   1000 images
+
+-   number of objects within each image is representative of ISIIS data
+
+-   within each image, objects are randomly distributed in 3D
 
 ```{r}
-# Pick random points within an image
-r_points <- tibble(
-  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
-  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
-  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
-  ) %>% 
-  mutate(img = ceiling(row_number() / n_pt))
-
+# Pick one image
+r_points <- rand_points %>% 
+  filter(img_name == "img_0001")
 
 # Plot one image
 r_points %>% 
-  filter(img == 1) %>% 
   ggplot() +
   geom_point(aes(x = x, y = y, colour = z)) +
   scale_colour_viridis_c() +
@@ -72,7 +67,8 @@ r_points %>%
 We can compute distances to nearest neighbour both in 2D and 3D and have a look at the correlation between. Let’s start with `spearman` correlation. First, we need to convert our dataframe into point pattern objects.
 
 ```{r}
-type_corr <- "spearman"
+#type_corr <- "spearman"
+type_corr <- "pearson"
 
 x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
 plot(x2D)
@@ -101,23 +97,23 @@ As expected, nnd2D are smaller or equal to nnd3D. When considering only one NN, 
 The number of NN to consider cannot exceed the `number of points - 1`.
 
 ```{r}
-rho <- sapply(c(1:(n_pt-1)), function(k_nn) {
+corr <- sapply(c(1:(nrow(r_points)-1)), function(k_nn) {
     nn2D <- nndist(x2D, k = k_nn)
     nn3D <- nndist(x3D, k = k_nn)
     cor(nn2D, nn3D, method = type_corr) 
 })
 
 res <- tibble(
-  n_pt = n_pt, # number of points in the set
-  k_nn = c(1:(n_pt-1)), # number of considered NN
+  n_pt = nrow(r_points), # number of points in the set
+  k_nn = c(1:(nrow(r_points)-1)), # number of considered NN
   prop_nn = k_nn/n_pt, # proportion of considered NN
-  rho = rho # correlation
+  corr = corr # correlation
   )  
 
 # Plot the result
 res %>% 
   ggplot() +
-  geom_path(aes(x = k_nn, y = rho))
+  geom_path(aes(x = k_nn, y = corr))
 ```
 
 We can also use the proportion of considered NN as x axis, to generalise when we vary the number of points within an image.
@@ -125,7 +121,7 @@ We can also use the proportion of considered NN as x axis, to generalise when we
 ```{r}
 res %>% 
   ggplot() +
-  geom_path(aes(x = prop_nn, y = rho))
+  geom_path(aes(x = prop_nn, y = corr))
 ```
 
 Now let’s check what happens when we vary the number of points within the image.
@@ -134,7 +130,7 @@ Now let’s check what happens when we vary the number of points within the imag
 
 ```{r}
 # Sizes of set of points
-n_pts <- c(10:15)
+n_pts <- c(15:25)
 
 # List of k NN to consider within each set
 k_nn <- sapply(n_pts, function(i){
@@ -153,13 +149,21 @@ res <- tibble(
 ) %>% 
   mutate(prop_nn = k_nn / n_pt)
 
-rho <- sapply(n_pts, function(i){
-  # Draw a set of points
-  r_points <- tibble(
-    x = runif(n = i, min = 1, max = 10240),
-    y = runif(n = i, min = 1, max = 2048),
-    z = runif(n = i, min = 1, max = 10240)
-  )
+# Select images that have between 15 and 25 points (one image for each value)
+img_sel <- rand_points %>% 
+  count(img_name) %>% 
+  filter(n %in% n_pts) %>% 
+  group_by(n) %>% 
+  slice_head(n = 1) %>% 
+  ungroup()
+
+corr <- sapply(n_pts, function(i){
+ 
+  # Get image name
+  img_name_i <- img_sel %>% filter(n == i) %>% pull(img_name)
+  
+  # Get points within this image
+  r_points <- rand_points %>% filter(img_name == img_name_i)
   
   # Convert to point pattern
   x2D <- ppp(r_points$x, r_points$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
@@ -176,12 +180,12 @@ rho <- sapply(n_pts, function(i){
 
 # Store result in dataframe
 res <- res %>% 
-  mutate(rho = unlist(rho))
+  mutate(corr = unlist(corr))
 
 # Plot
 res %>% 
   ggplot() +
-  geom_path(aes(x = prop_nn, y = rho)) +
+  geom_path(aes(x = prop_nn, y = corr)) +
   facet_wrap(~n_pt)
 ```
 
@@ -194,24 +198,19 @@ To answer this question, we need to draw numerous set of points of different siz
 ### Fixed number of points and 1 NN
 
 ```{r}
-# Number of images
-n_img <- 100
-
 # Nuber of points in each images
 n_pt <- 20
 
-# Draw set of points
-r_points <- tibble(
-  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
-  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
-  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
-  ) %>% 
-  mutate(img = ceiling(row_number() / n_pt))
+# Get points within images with a fixed number of points
+r_points <- rand_points %>% 
+  add_count(img_name) %>% 
+  filter(n == n_pt) %>% 
+  select(-n)
 
 # Compute correlations
-corrs <- sapply(1:n_img, function(i_img){# across images
+corrs <- sapply(unique(r_points$img_name), function(i_img){# across images
   # Convert to point pattern
-  r_points_img <- r_points %>% filter(img == i_img)
+  r_points_img <- r_points %>% filter(img_name == i_img)
   x2D <- ppp(r_points_img$x, r_points_img$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
   x3D <- pp3(r_points_img$x, r_points_img$y, r_points_img$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
   
@@ -233,27 +232,20 @@ Now let’s vary the number of considered NN.
 
 ```{r}
 #| warning: false
-# Number of images
-n_img <- 100
-
 # Nuber of points in each images
 n_pt <- 20
 
-# Draw set of points
-r_points <- tibble(
-  x = runif(n = n_pt*n_img, min = 1, max = vol$x),
-  y = runif(n = n_pt*n_img, min = 1, max = vol$y),
-  z = runif(n = n_pt*n_img, min = 1, max = vol$z)
-  ) %>% 
-  mutate(img = ceiling(row_number() / n_pt))
+# Get points within images with a fixed number of points
+r_points <- rand_points %>% 
+  add_count(img_name) %>% 
+  filter(n == n_pt) %>% 
+  select(-n)
 
-# Compute correlation over images
-corrs <- sapply(1:n_img, function(i_img){ # across images
-  
-  # Get points corresponding to given image
-  r_points_img <- r_points %>% filter(img == i_img)
-  
+
+# Compute correlations
+corrs <- sapply(unique(r_points$img_name), function(i_img){# across images
   # Convert to point pattern
+  r_points_img <- r_points %>% filter(img_name == i_img)
   x2D <- ppp(r_points_img$x, r_points_img$y, window = owin(xrange = c(1, 10240), yrange = c(1, 2048)))
   x3D <- pp3(r_points_img$x, r_points_img$y, r_points_img$z, box3(xrange = c(1, 10240), yrange = c(1, 2048), zrange = c(1, 10240)))
   
@@ -261,10 +253,12 @@ corrs <- sapply(1:n_img, function(i_img){ # across images
   sapply(c(2:(n_pt-1)), function(k_nn) {
     nn2D <- nndist(x2D, k = k_nn)
     nn3D <- nndist(x3D, k = k_nn)
-    cor(nn2D, nn3D, method = "pearson") 
+    cor(nn2D, nn3D, method = type_corr) 
   })
   
 })
+
+
 
 dim(corrs)
 # rows represent the number of NN considered
@@ -272,15 +266,13 @@ dim(corrs)
 
 # Convert to df
 corrs <- as_tibble(corrs)
-# Set colnames
-colnames(corrs) <- str_replace(colnames(corrs), "V", "img_")
 # Add number of considered NN
 corrs <- corrs %>% 
   mutate(
     k_nn = 2:(n_pt - 1), 
-    prop_nn = k_nn / n_pt,
-    .before = img_1
-    )
+    prop_nn = k_nn / n_pt
+    ) %>% 
+  select(k_nn, prop_nn, everything())
 # Rearrange to vertical
 corrs <- corrs %>% 
   pivot_longer(contains("img"), names_to = "img", values_to = "corr")
@@ -315,28 +307,28 @@ ggplot(med_corrs) +
 ### Varying number of points and multiple NN
 
 ```{r}
-# Sizes of set of points (pick something somewhat representative of ISIIS)
-n_pts <- c(5:20)
+# Sizes of set of points
+n_pts <- c(15:25)
 
-# Number of images per size of set of points
-n_img <- 1000
+# Select images that have between 15 and 25 points (one image for each value)
+img_sel <- rand_points %>% 
+  count(img_name) %>% 
+  filter(n %in% n_pts)
 
 # Compute correlations
 corrs <- sapply(n_pts, function(i){ # across number of points
   
-  # Draw a set of points
-  r_points <- tibble(
-      x = runif(n = i * n_img, min = 1, max = 10240),
-      y = runif(n = i * n_img, min = 1, max = 2048),
-      z = runif(n = i * n_img, min = 1, max = 10240)
-    ) %>% 
-    mutate(img = ceiling(row_number() / i))
+  # Get image name
+  img_names <- img_sel %>% filter(n == i) %>% pull(img_name)
+  
+  # Get points within this image
+  r_points <- rand_points %>% filter(img_name %in% img_names)
   
   # Compute correlation over images
-  sapply(1:n_img, function(i_img){ # across images
+  sapply(unique(r_points$img_name), function(i_img){ # across images
   
   # Get points corresponding to given image
-    r_points_img <- r_points %>% filter(img == i_img)
+    r_points_img <- r_points %>% filter(img_name == i_img)
     
     # Convert to point pattern
     x2D <- ppp(
@@ -355,7 +347,7 @@ corrs <- sapply(n_pts, function(i){ # across number of points
     sapply(c(2:(i-1)), function(k_nn) { # across number of NN
       nn2D <- nndist(x2D, k = k_nn)
       nn3D <- nndist(x3D, k = k_nn)
-      cor(nn2D, nn3D, method = "pearson") 
+      cor(nn2D, nn3D, method = type_corr) 
     })
   })
 })
@@ -365,11 +357,29 @@ corrs <- sapply(n_pts, function(i){ # across number of points
 # - cols are images
 # - rows are number of considered NN
 
+# These have different shape, we will pad with columns of NA up to the max number of image for a given number of points
+img_max <- img_sel %>% count(n, name = "n_img") %>% pull(n_img) %>% max()
+
+pad_df <- function(df, n_img_max){
+  # number of dummy columns/images to generate
+  n_dummy_img <- img_max - ncol(df)
+  # number of NN
+  n_nn <- nrow(df)
+  
+  df <- bind_cols(
+    df,
+    matrix(NA, nrow = n_nn, ncol = n_dummy_img) %>% 
+      as_tibble()
+  )
+  # Add columns names (separately to have the right number of columns)
+  df <- df %>% setNames(paste0("img_", 1:ncol(df)))
+}
+
+# Apply padding to all df
+corrs <- lapply(corrs, pad_df, n_img_max = img_max)
+
 # Bind lists into a dataframe
 corrs <- do.call(rbind, corrs) %>% as_tibble()
-
-# Set colnames
-colnames(corrs) <- str_replace(colnames(corrs), "V", "img_")
 
 # Columns are images
 # We need to fill
@@ -397,7 +407,7 @@ Have a look at the median.
 #| warning: false
 med_corrs <- corrs %>% 
   group_by(n_pt, prop_nn) %>% 
-  summarise(med = median(corr)) %>% 
+  summarise(med = median(corr, na.rm = TRUE)) %>% 
   ungroup()
 
 best_med <- med_corrs %>% filter(med == max(med)) %>% pull(med)
@@ -408,3 +418,91 @@ ggplot(med_corrs) +
   scale_y_continuous(limits = c(0,1)) +
   labs(y = "Correlation median")
 ```
+
+```{r}
+rand_points
+
+```
+
+## From 2D to 3D?
+
+### Compute all distances in 2D
+
+```{r}
+# Loop over images and compute distances between all points within each image
+dist_all_2d <- mclapply(unique(rand_points$img_name), function(name) {
+  # Get points within image
+  points <- rand_points %>% 
+    filter(img_name == name) %>% 
+    select(x, y) %>% 
+    as.matrix()
+  # Compute distances between points
+  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
+    as_tibble() %>% 
+    filter(p1 != p2) %>% 
+    mutate(img_name = name)
+}, mc.cores = n_cores)
+
+# Combine results in a dataframe
+dist_all_2d <- do.call(bind_rows, dist_all_2d) %>% rename(dist = value)
+
+```
+
+### Compute all distances in 3D
+
+```{r}
+# Loop over images and compute distances between all points within each image
+dist_all_3d <- mclapply(unique(rand_points$img_name), function(name) {
+  # Get points within image
+  points <- rand_points %>% 
+    filter(img_name == name) %>% 
+    select(x, y, z) %>% 
+    as.matrix()
+  # Compute distances between points
+  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
+    as_tibble() %>% 
+    filter(p1 != p2) %>% 
+    mutate(img_name = name)
+}, mc.cores = n_cores)
+
+# Combine results in a dataframe
+dist_all_3d <- do.call(bind_rows, dist_all_3d) %>% rename(dist = value)
+
+```
+
+### Compare 3D and 2D
+
+We can expect distances in 2D to be 2/3 of distances in 3D. Let’s plot this:
+
+-   black line shows upper bound (distance in 2D cannot be larger than distance in 3D)
+
+-   red line shows the expected 2/3 relationship
+
+-   blue line is a linear fit with `intercept = 0`
+
+```{r}
+df <- tibble(
+  dist_2D = dist_all_2d$dist,
+  dist_3D = dist_all_3d$dist
+  ) 
+df %>% 
+  slice_sample(n = 1000) %>% 
+  ggplot(aes(x = dist_3D, y = dist_2D)) +
+  geom_abline(slope = 1, intercept = 0) +
+  geom_abline(slope = 2/3, intercept = 0, colour = "red") +
+  geom_point() +
+  stat_smooth(method = "lm", formula = "y ~ x + 0") 
+```
+
+Note too bad! Let’s actually fit the model to get the slope.
+
+```{r}
+mod <- lm(dist_2D ~ 0 + dist_3D, data = df)
+summary(mod)
+```
+
+Indeed, close to the expected 2/3 ratio.
+
+## Conclusion
+
+Use all distances within an image! 3D distance could be computed from 2D distance.

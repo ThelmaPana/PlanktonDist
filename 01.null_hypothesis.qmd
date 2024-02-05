@@ -4,6 +4,7 @@ author: "Thelma Panaïotis"
 format: 
   html:
     toc: true
+    embed-resources: true
 editor: visual
 lightbox: true
 execute:
@@ -119,8 +120,9 @@ ggplot(dist_all_rand) +
 
 # Plot all
 ggplot(dist_all_rand) + 
-  geom_density(aes(x = dist))
+  geom_density(aes(x = dist)) +
+  labs(title = "Density distribution of distances for a random distribution")
 
 # Save it
-save(dist_all_rand, file = "data/01.null_data.Rdata")
+save(dist_all_rand, rand_points, file = "data/01.null_data.Rdata")
 ```

@@ -4,6 +4,7 @@ author: "Thelma Panaïotis"
 format: 
   html:
     toc: true
+    embed-resources: true
 editor: visual
 lightbox: true
 execute:
@@ -116,9 +117,25 @@ Now let’s take a step back.
 pl_per_img <- plankton %>% count(img_name)
 summary(pl_per_img$n)
 ggplot(pl_per_img) + 
-  geom_histogram(aes(x = n), bins = 200) +
-  scale_y_log10() +
+  geom_density(aes(x = n)) +
   labs(x = "Organisms per image")
+```
+
+Let’s do a rank/frequency plot to better see the power law.
+
+```{r nb_org_log}
+p <- ecdf(pl_per_img$n)
+
+pl_per_img %>% 
+  mutate(ecdf = p(n)) %>% 
+  filter(n > 11) %>% 
+  arrange(desc(n)) %>% 
+  add_count(n, name = "count") %>% 
+  mutate(cum_count = cumsum(as.numeric(count))) %>% 
+  ggplot() +
+  geom_path(aes(x = n, y = cum_count)) +
+  scale_x_log10() + scale_y_log10() +
+  labs(y = "Img with value > n")
 ```
 
 ### Taxonomy
@@ -222,9 +239,11 @@ The dataset has a few drawbacks that need to be accounted for:
 
 -   classification precision and recall
 
+-   non-homogeneous turbulence
+
 -   varying conditions (env, day VS night…)
 
--   variations of towing speed, i.e. pixel size in `x` axis can vary, but there are round objects in the dataset, and their deformation can provide information to correct this bias.
+-   variations of towing speed, i.e. pixel size in `x` axis can vary, but there are round objects (solitary Collodaria) in the dataset, and their deformation can provide information to correct this bias.
 
 -   a 3D volume is projected onto a 2D image, what information does this gave us regarding the true position of organisms? ➝ run simulations
 
@@ -234,13 +253,13 @@ The dataset has a few drawbacks that need to be accounted for:
 
 -   division
 
--   non-homogeneous turbulence
-
 -   size
 
 ## Steps of analyses
 
 ### Null hypothesis
+
+The distribution below is an exemple of what we could expect for distances in the case of randomly distributed objects (i.e. null hypothesis).
 
 ```{r norm}
 ggplot(data.frame(x = c(0, 10)), aes(x = x)) +
