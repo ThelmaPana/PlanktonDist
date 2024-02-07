@@ -107,18 +107,35 @@ dist_all_rand <- mclapply(unique(rand_points$img_name), function(name) {
   melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
     as_tibble() %>% 
     filter(p1 != p2) %>% 
-    mutate(img_name = name)
+    rename(dist = value) %>% 
+    mutate(img_name = name) %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = paste0(p1, p2)) %>% 
+    mutate(pair = vapply(strsplit(pair, NULL), function(x) paste(sort(x), collapse = ''), '')) %>%
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
 }, mc.cores = n_cores)
 
 # Combine results in a dataframe
-dist_all_rand <- do.call(bind_rows, dist_all_rand) %>% rename(dist = value)
+dist_all_rand <- do.call(bind_rows, dist_all_rand)
+
+# Check that we have the number of expected distances within each image
+# For a set of n points, the number of unique distances is n(n-1)/2
+dist_ok <- left_join(
+    rand_points %>% count(img_name, name = "n_obj"),
+    dist_all_rand %>% count(img_name, name = "n_dist"),
+    by = join_by(img_name)
+  ) %>% 
+  mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
+
+all(dist_ok$ok) # should return TRUE
+
 
 # Plot all
 ggplot(dist_all_rand) + 
-  geom_density(aes(x = dist, colour = img_name), linewidth = 0.02, show.legend = F) +
+  geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
   geom_density(aes(x = dist))
 
-# Plot all
 ggplot(dist_all_rand) + 
   geom_density(aes(x = dist)) +
   labs(title = "Density distribution of distances for a random distribution")
