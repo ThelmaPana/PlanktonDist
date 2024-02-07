@@ -15,6 +15,7 @@ execute:
 
 ```{r set_up}
 #| echo: false
+#| cache: false
 source("utils.R")
 ```
 
@@ -25,7 +26,7 @@ images <- read_parquet(here("data/00.images_clean.parquet"))
 plankton <- read_parquet(here("data/00.plankton_clean.parquet"))
 
 ## Subsample
-images <- images %>% slice_sample(n = 1000)
+images <- images %>% slice_sample(n = 10000)
 plankton <- plankton %>% filter(img_name %in% images$img_name)
 
 # list img names
@@ -102,6 +103,69 @@ out <-  kuiper_test(s1, s2)
 out
 summary(out)
 plot(out)
-
-
 ```
+
+… and indeed it is similar!
+
+::: {.callout-note icon="false"}
+## Conclusion
+
+**Distances between planktonic organisms at the local scale do not differ from the distances that could be expected if plankton was randomly distributed.**
+:::
+
+This is quite unexpected, let’s perform an additional test to confirm (or infirm) this.
+
+## Complete spatial randomness test based on quadrats
+
+Let’s perform a test of complete spatial randomness (CSR) based on quadrat counts for each image.
+
+```{r quadrats_test}
+# 1 image = 5 square frames
+# we can do 10 quadrats in x and 2 in y: square quadraits, 20 per image
+nx <- 10 # quadrats in x dimension
+ny <- 2  # quadrats in y dimension
+
+# p-value threshold for randomness
+thres <- 0.01
+
+# Loop over images and perform the quadrat test in each one
+qt_all <- mclapply(img_names, function(name) {
+  # Get points within image
+  points <- plankton %>% 
+    filter(img_name == name) %>% 
+    select(centroid_0, centroid_1)
+  
+  # Convert to ppp
+  # x is centroid_1, y is centroid_0
+  points_ppp <- ppp(points$centroid_1, points$centroid_0, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
+  
+  # Perform quadrat test and extract p-value
+  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo")
+  
+  # Store results in a tibble and return it
+  tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)
+}, mc.cores = n_cores)
+
+# Transform list to one tibble
+df_qt <- do.call(bind_rows, qt_all) %>% 
+  # distribution is random if p_value > thres
+  mutate(random = ifelse(p_value < thres, FALSE, TRUE))
+summary(df_qt)
+```
+
+Positions of planktonic organisms are indeed random in most cases, and the few cases of non-randomness are caused by the p-value threshold that we used: `r percent(1 - (sum(df_qt$random) / nrow(df_qt)), accuracy = 0.01)` of non-randomness for a randomness threshold set at `r percent(thres)` .
+
+Let’s plot the distribution of p-values and check that there is no relationship between p-value and the number of objects within the image.
+
+```{r plot_p_val}
+ggplot(df_qt) + geom_histogram(aes(x = p_value), bins = 100)
+ggplot(df_qt) + geom_density_2d(aes(x = n_obj, y = p_value))
+```
+
+All good!
+
+::: {.callout-note icon="false"}
+## Conclusion
+
+**When considering all planktonic organisms regardless of their taxa, they are randomly distributed at the local scale.**
+:::
