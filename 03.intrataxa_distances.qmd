@@ -1,0 +1,110 @@
+---
+title: "Investigate distances between organisms within taxonomic groups."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+```{r read}
+
+## All data
+images <- read_parquet(here("data/00.images_clean.parquet"))
+plankton <- read_parquet(here("data/00.plankton_clean.parquet"))
+
+## Subsample
+images <- images %>% slice_sample(n = 10000)
+plankton <- plankton %>% filter(img_name %in% images$img_name)
+
+# list img names
+img_names <- sort(unique(images$img_name))
+
+# list taxa
+taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
+
+## Null hypothesis data
+load(here("data/01.null_data.Rdata"))
+```
+
+Define window size for point pattern analysis.
+
+```{r vol_size}
+# image volume in pixels
+vol <- c()
+vol$x <- 10240
+vol$y <- 2048
+vol$z <- 9572
+```
+
+## Distances between all Appendicularia
+
+Here we only consider images with several Appendicularia
+
+```{r app}
+my_taxon <- "Appendicularia"
+
+app <- plankton %>% 
+  filter(taxon == my_taxon) %>% 
+  add_count(img_name) %>% 
+  filter(n > 1)
+app_img <- images %>% filter(img_name %in% app$img_name)
+
+img_names <- app_img %>% pull(img_name)
+my_img <- img_names[1:10]
+name <- my_img[1]
+
+# Loop over images and compute distances between all points within each image
+dist_all <- mclapply(img_names, function(name) {
+  # Get points within image
+  points <- app %>% 
+    filter(img_name == name) %>% 
+    filter(taxon == my_taxon) %>% 
+    select(centroid_0, centroid_1) %>% 
+    as.matrix()
+  # Compute distances between points
+  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
+    as_tibble() %>% 
+    # Ignore distance from one point to itself
+    filter(p1 != p2) %>% 
+    rename(dist = value) %>% 
+    mutate(img_name = name) %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = paste0(p1, p2)) %>% 
+    mutate(pair = vapply(strsplit(pair, NULL), function(x) paste(sort(x), collapse = ''), '')) %>%
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
+}, mc.cores = n_cores)
+
+
+# Combine results in a dataframe
+dist_all <- do.call(bind_rows, dist_all)
+
+# Check that we have the number of expected distances within each image
+# For a set of n points, the number of unique distances is n(n-1)/2
+dist_ok <- left_join(
+    app %>% count(img_name, name = "n_obj"),
+    dist_all %>% count(img_name, name = "n_dist"),
+    by = join_by(img_name)
+  ) %>% 
+  mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
+
+all(dist_ok$ok) # should return TRUE
+
+# Plot all
+ggplot(dist_all) + 
+  geom_density(aes(x = dist))
+
+```
