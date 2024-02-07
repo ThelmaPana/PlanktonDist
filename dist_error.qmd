@@ -7,14 +7,19 @@ format:
     embed-resources: true
 editor: visual
 lightbox: true
-cache: false
+cache: true
 ---
 
 ```{r set_up}
 #| echo: false
 #| output: false
+#| cache: false
 source("utils.R")
 
+```
+
+```{r read_data}
+#| cache.lazy: false
 # Read data
 images <- read_parquet("data/00.images_clean.parquet")
 plankton <- read_parquet("data/00.plankton_clean.parquet")
@@ -440,11 +445,16 @@ dist_all_2d <- mclapply(unique(rand_points$img_name), function(name) {
   melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
     as_tibble() %>% 
     filter(p1 != p2) %>% 
-    mutate(img_name = name)
+    rename(dist = value) %>% 
+    mutate(img_name = name) 
 }, mc.cores = n_cores)
 
 # Combine results in a dataframe
-dist_all_2d <- do.call(bind_rows, dist_all_2d) %>% rename(dist = value)
+dist_all_2d <- do.call(bind_rows, dist_all_2d) %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
 
 ```
 
@@ -462,12 +472,16 @@ dist_all_3d <- mclapply(unique(rand_points$img_name), function(name) {
   melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
     as_tibble() %>% 
     filter(p1 != p2) %>% 
-    mutate(img_name = name)
+    rename(dist = value) %>% 
+    mutate(img_name = name) 
 }, mc.cores = n_cores)
 
 # Combine results in a dataframe
-dist_all_3d <- do.call(bind_rows, dist_all_3d) %>% rename(dist = value)
-
+dist_all_3d <- do.call(bind_rows, dist_all_3d) %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
 ```
 
 ### Compare 3D and 2D
@@ -501,8 +515,10 @@ mod <- lm(dist_2D ~ 0 + dist_3D, data = df)
 summary(mod)
 ```
 
-Indeed, close to the expected 2/3 ratio.
+Indeed, close to the expected 2/3 ratio, but with a lot of (expected) heteroskedasticity.
 
+::: {.callout-note icon="false"}
 ## Conclusion
 
-Use all distances within an image! 3D distance could be computed from 2D distance.
+**Use all distances within an image! 3D distance could be computed from 2D distance.**
+:::

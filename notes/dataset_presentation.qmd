@@ -17,6 +17,7 @@ execute:
 #| echo: false
 #| output: false
 #| warning: false
+#| cache: false
 source(here::here("utils.R"))
 ```
 
@@ -286,7 +287,7 @@ ggplot(data.frame(x = c(0:10)), aes(x = x)) +
 
 If distances between all organisms has a distribution that differs from the null hypothesis, then planktonic organisms are not randomly distributed.
 
-Other way to test for overall randomness: draw quadrats of equal size in images, there should be the \~same number of organisms in each quadrat (for a given concentration, i.e. not necessarily across images).
+Other way to test for overall randomness: draw quadrats of equal size in images and count organisms within quadrats (see <https://www.paulamoraga.com/book-spatial/complete-spatial-randomness.html>).
 
 ### Intraspecific
 

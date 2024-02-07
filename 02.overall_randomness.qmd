@@ -9,7 +9,7 @@ editor: visual
 lightbox: true
 execute:
   warning: false
-  cache: false
+  cache: true
   freeze: false
 ---
 
@@ -19,7 +19,12 @@ execute:
 source("utils.R")
 ```
 
+::: {.callout-warning icon="false"}
+Work with a subsample of the data: 10,000 images.
+:::
+
 ```{r read}
+#| cache.lazy: false
 
 ## All data
 images <- read_parquet(here("data/00.images_clean.parquet"))
@@ -63,21 +68,20 @@ dist_all <- mclapply(img_names, function(name) {
     as_tibble() %>% 
     filter(p1 != p2) %>% 
     rename(dist = value) %>% 
-    mutate(img_name = name) %>% 
-    # Keep only one of distances compute between A and B (A to B and B to A were computed)
-    mutate(pair = paste0(p1, p2)) %>% 
-    mutate(pair = vapply(strsplit(pair, NULL), function(x) paste(sort(x), collapse = ''), '')) %>%
-    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
-    select(-pair)
+    mutate(img_name = name) 
 }, mc.cores = n_cores)
 
 # Combine results in a dataframe
-dist_all <- do.call(bind_rows, dist_all)
+dist_all <- do.call(bind_rows, dist_all) %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
 
 # Check that we have the number of expected distances within each image
 # For a set of n points, the number of unique distances is n(n-1)/2
 dist_ok <- left_join(
-    plankton %>% count(img_name, name = "n_obj"),
+    plankton %>% filter(img_name %in% img_names) %>% count(img_name, name = "n_obj"),
     dist_all %>% count(img_name, name = "n_dist"),
     by = join_by(img_name)
   ) %>% 
