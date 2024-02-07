@@ -8,6 +8,7 @@ suppressWarnings(library(parallel))
 # Null hypothesis
 suppressWarnings(library(MASS))
 suppressWarnings(library(twosamples))
+suppressWarnings(library(extraDistr))
 
 # Reading data
 suppressWarnings(library(arrow))
