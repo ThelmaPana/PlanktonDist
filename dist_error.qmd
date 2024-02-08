@@ -38,7 +38,7 @@ We draw a set of points within the volume of an ISIIS image. This volume is:
 
 -   50 cm depth ≈ 9752 px (`z` dimension, compressed in images).
 
-```{r}
+```{r image_vol}
 # image volume
 vol <- c()
 vol$x <- 10240
@@ -54,7 +54,7 @@ Null data has been generated:
 
 -   within each image, objects are randomly distributed in 3D
 
-```{r}
+```{r plot_one}
 # Pick one image
 r_points <- rand_points %>% 
   filter(img_name == "img_0001")
@@ -71,7 +71,7 @@ r_points %>%
 
 We can compute distances to nearest neighbour both in 2D and 3D and have a look at the correlation between. Let’s start with `spearman` correlation. First, we need to convert our dataframe into point pattern objects.
 
-```{r}
+```{r 1_nn}
 #type_corr <- "spearman"
 type_corr <- "pearson"
 
@@ -101,7 +101,7 @@ As expected, nnd2D are smaller or equal to nnd3D. When considering only one NN, 
 
 The number of NN to consider cannot exceed the `number of points - 1`.
 
-```{r}
+```{r k_nn}
 corr <- sapply(c(1:(nrow(r_points)-1)), function(k_nn) {
     nn2D <- nndist(x2D, k = k_nn)
     nn3D <- nndist(x3D, k = k_nn)
@@ -123,7 +123,7 @@ res %>%
 
 We can also use the proportion of considered NN as x axis, to generalise when we vary the number of points within an image.
 
-```{r}
+```{r plot_prop_nn}
 res %>% 
   ggplot() +
   geom_path(aes(x = prop_nn, y = corr))
@@ -133,7 +133,7 @@ Now let’s check what happens when we vary the number of points within the imag
 
 ### Varying the number of points
 
-```{r}
+```{r n_pts}
 # Sizes of set of points
 n_pts <- c(15:25)
 
@@ -202,7 +202,7 @@ To answer this question, we need to draw numerous set of points of different siz
 
 ### Fixed number of points and 1 NN
 
-```{r}
+```{r pt_1nn}
 # Nuber of points in each images
 n_pt <- 20
 
@@ -235,7 +235,7 @@ summary(corrs)
 
 Now let’s vary the number of considered NN.
 
-```{r}
+```{r pt_knn}
 #| warning: false
 # Nuber of points in each images
 n_pt <- 20
@@ -296,7 +296,7 @@ We want the proportion of NN that gives the best correlation.
 
 Consider using the median?
 
-```{r}
+```{r med_cors}
 med_corrs <- corrs %>% 
   group_by(prop_nn) %>% 
   summarise(med = median(corr)) %>% 
@@ -311,7 +311,7 @@ ggplot(med_corrs) +
 
 ### Varying number of points and multiple NN
 
-```{r}
+```{r pts_knn}
 # Sizes of set of points
 n_pts <- c(15:25)
 
@@ -408,7 +408,7 @@ corrs <- corrs %>%
 
 Have a look at the median.
 
-```{r}
+```{r med_pts_knn}
 #| warning: false
 med_corrs <- corrs %>% 
   group_by(n_pt, prop_nn) %>% 
@@ -424,64 +424,13 @@ ggplot(med_corrs) +
   labs(y = "Correlation median")
 ```
 
-```{r}
-rand_points
-
-```
-
 ## From 2D to 3D?
 
-### Compute all distances in 2D
+### Compute all distances in 2D and 3D
 
-```{r}
-# Loop over images and compute distances between all points within each image
-dist_all_2d <- mclapply(unique(rand_points$img_name), function(name) {
-  # Get points within image
-  points <- rand_points %>% 
-    filter(img_name == name) %>% 
-    select(x, y) %>% 
-    as.matrix()
-  # Compute distances between points
-  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
-    as_tibble() %>% 
-    filter(p1 != p2) %>% 
-    rename(dist = value) %>% 
-    mutate(img_name = name) 
-}, mc.cores = n_cores)
-
-# Combine results in a dataframe
-dist_all_2d <- do.call(bind_rows, dist_all_2d) %>% 
-    # Keep only one of distances compute between A and B (A to B and B to A were computed)
-    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
-    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
-    select(-pair)
-
-```
-
-### Compute all distances in 3D
-
-```{r}
-# Loop over images and compute distances between all points within each image
-dist_all_3d <- mclapply(unique(rand_points$img_name), function(name) {
-  # Get points within image
-  points <- rand_points %>% 
-    filter(img_name == name) %>% 
-    select(x, y, z) %>% 
-    as.matrix()
-  # Compute distances between points
-  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
-    as_tibble() %>% 
-    filter(p1 != p2) %>% 
-    rename(dist = value) %>% 
-    mutate(img_name = name) 
-}, mc.cores = n_cores)
-
-# Combine results in a dataframe
-dist_all_3d <- do.call(bind_rows, dist_all_3d) %>% 
-    # Keep only one of distances compute between A and B (A to B and B to A were computed)
-    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
-    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
-    select(-pair)
+```{r comp_dist}
+dist_all_2d <- compute_all_dist(rand_points, z_dim = FALSE)
+dist_all_3d <- compute_all_dist(rand_points, z_dim = TRUE)
 ```
 
 ### Compare 3D and 2D
@@ -494,7 +443,7 @@ We can expect distances in 2D to be 2/3 of distances in 3D. Let’s plot this:
 
 -   blue line is a linear fit with `intercept = 0`
 
-```{r}
+```{r 2d_vs_3d}
 df <- tibble(
   dist_2D = dist_all_2d$dist,
   dist_3D = dist_all_3d$dist
@@ -510,7 +459,7 @@ df %>%
 
 Note too bad! Let’s actually fit the model to get the slope.
 
-```{r}
+```{r mod_2d_3d}
 mod <- lm(dist_2D ~ 0 + dist_3D, data = df)
 summary(mod)
 ```

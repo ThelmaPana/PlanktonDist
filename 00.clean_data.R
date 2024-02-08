@@ -22,7 +22,7 @@ plankton <- plankton %>%
   select(
     transect, img_name, object_id = id, taxon,
     datetime, lat, lon, dist, depth,
-    centroid_0, centroid_1
+    x = centroid_1, y = centroid_0,
   ) %>% 
   # join with cops
   left_join(cops %>% select(object_id, new_taxon = taxon), by = join_by(object_id)) %>% 
@@ -31,8 +31,8 @@ plankton <- plankton %>%
   select(-new_taxon)
 
 # Read clean taxa names
-clean_taxa <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE)
-taxa <- clean_taxa %>% select(taxon = orig_name, new_taxon = new_name) %>% drop_na(new_taxon) %>% pull(new_taxon) %>% sort()
+clean_taxa <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE) %>% select(taxon = orig_name, new_taxon = new_name)
+taxa <- clean_taxa %>% drop_na(new_taxon) %>% pull(new_taxon) %>% sort()
 
 # Add clean taxa names to plankton table
 plankton <- plankton %>% 
@@ -63,7 +63,6 @@ write_parquet(images, sink = "data/00.images_clean.parquet")
 #--------------------------------------------------------------------------#
 # Generate a subsample of 100 images for tests
 n_img <- 100
-set.seed(seed)
 # subsample images
 images_sub <- images %>% slice_sample(n = n_img) 
 # keep plankton in sampled images

@@ -56,41 +56,12 @@ vol$z <- 9572
 To investigate overall randomness, let’s compute distances between all pairs of organisms within an image.
 
 ```{r all_dist}
+#| warning: false
 # Loop over images and compute distances between all points within each image
-dist_all <- mclapply(img_names, function(name) {
-  # Get points within image
-  points <- plankton %>% 
-    filter(img_name == name) %>% 
-    select(centroid_0, centroid_1) %>% 
-    as.matrix()
-  # Compute distances between points
-  melt(as.matrix(dist(points)), varnames = c("p1", "p2")) %>% 
-    as_tibble() %>% 
-    filter(p1 != p2) %>% 
-    rename(dist = value) %>% 
-    mutate(img_name = name) 
-}, mc.cores = n_cores)
-
-# Combine results in a dataframe
-dist_all <- do.call(bind_rows, dist_all) %>% 
-    # Keep only one of distances compute between A and B (A to B and B to A were computed)
-    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
-    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
-    select(-pair)
-
-# Check that we have the number of expected distances within each image
-# For a set of n points, the number of unique distances is n(n-1)/2
-dist_ok <- left_join(
-    plankton %>% filter(img_name %in% img_names) %>% count(img_name, name = "n_obj"),
-    dist_all %>% count(img_name, name = "n_dist"),
-    by = join_by(img_name)
-  ) %>% 
-  mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
-
-all(dist_ok$ok) # should return TRUE
+dist_all <- compute_all_dist(plankton, n_cores = n_cores)
 
 # Plot all
-ggplot(dist_all_rand) + 
+ggplot(dist_all) + 
   geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
   geom_density(aes(x = dist))
 
@@ -153,11 +124,10 @@ qt_all <- mclapply(img_names, function(name) {
   # Get points within image
   points <- plankton %>% 
     filter(img_name == name) %>% 
-    select(centroid_0, centroid_1)
+    select(x, y)
   
   # Convert to ppp
-  # x is centroid_1, y is centroid_0
-  points_ppp <- ppp(points$centroid_1, points$centroid_0, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
+  points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
   
   # Perform quadrat test and extract p-value
   qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo")

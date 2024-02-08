@@ -58,8 +58,65 @@ set.seed(1)
 coast <- read_csv(file.path(data_dir, "raw/coast.csv"), show_col_types = FALSE)
 
 
-## Resampling procedure for  edges probability ----
+## Functions ----
 #--------------------------------------------------------------------------#
+#' Compute distances between all points within an ensemble of images
+#' 
+#' In each image, the distance between all unique pairs of points is computed.
+#'
+#' @param points dataframe with columns `x` and `y` for point position and `img_name` for image reference
+#' @param n_cores number of cores to use for parallel processing
+#' @param z_dim whether to consider 3rd dimension (`z`)
+#'
+#' @return a dataframe with all distances for each image
+#' 
+compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
+  dist_all <- mclapply(unique(points$img_name), function(name) {
+    
+    # Get points within image
+    if (z_dim){ # 3D case
+      points_img <-  points %>% 
+        filter(img_name == name) %>% 
+        select(x, y, z) %>% 
+        as.matrix()
+    } else { # 2D case
+      points_img <-  points %>% 
+        filter(img_name == name) %>% 
+        select(x, y) %>% 
+        as.matrix()
+    }
+    
+    # Compute distances between points
+    melt(as.matrix(dist(points_img)), varnames = c("p1", "p2")) %>% 
+      as_tibble() %>% 
+      filter(p1 != p2) %>% 
+      rename(dist = value) %>% 
+      mutate(img_name = name)
+  }, mc.cores = n_cores)
+  
+  # Combine results in a dataframe
+  dist_all <- do.call(bind_rows, dist_all)  %>% 
+    # Keep only one of distances compute between A and B (A to B and B to A were computed)
+    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
+    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
+    select(-pair)
+  
+  # Check that we have the number of expected distances within each image
+  # For a set of n points, the number of unique distances is n(n-1)/2
+  dist_ok <- left_join(
+    points %>% count(img_name, name = "n_obj"),
+    dist_all %>% count(img_name, name = "n_dist"),
+    by = join_by(img_name)
+  ) %>% 
+    mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
+  
+  if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points.")} # should return TRUE
+  
+  return(dist_all)
+}
+
+
+
 #' Resampling procedure for  edges probability
 #'
 #' @param counts Data of observed counts with dimensions n x p, either a matrix, data.frame or tibble.
