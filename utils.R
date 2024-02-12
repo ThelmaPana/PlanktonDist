@@ -47,6 +47,14 @@ n_img <- 10000 # number of images to consider for subsampling
 n_dist <- 10000 # number of distances to retain for comparisons
 
 
+## Image volume ----
+#--------------------------------------------------------------------------#
+# image volume in pixels
+vol <- c()
+vol$x <- 10240
+vol$y <- 2048
+vol$z <- 9572
+
 ## Directories ----
 #--------------------------------------------------------------------------#
 data_dir <- here("data")

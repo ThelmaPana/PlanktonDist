@@ -49,16 +49,6 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 load(here("data/01.null_data.Rdata"))
 ```
 
-Define window size for point pattern analysis.
-
-```{r vol_size}
-# image volume in pixels
-vol <- c()
-vol$x <- 10240
-vol$y <- 2048
-vol$z <- 9572
-```
-
 ## Number of objects per image for given taxon
 
 Get objects and images of the given taxon.
