@@ -40,6 +40,12 @@ suppressWarnings(library(ggtext))
 
 theme_set(theme_minimal())
 
+## Subsampling ----
+#--------------------------------------------------------------------------#
+sub_sample <- TRUE # whether to subsample or not
+n_img <- 10000 # number of images to consider for subsampling
+n_dist <- 10000 # number of distances to retain for comparisons
+
 
 ## Directories ----
 #--------------------------------------------------------------------------#

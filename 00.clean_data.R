@@ -62,7 +62,7 @@ write_parquet(images, sink = "data/00.images_clean.parquet")
 ## Save a subsample ----
 #--------------------------------------------------------------------------#
 # Generate a subsample of 100 images for tests
-n_img <- 100
+n_img <- 10000
 # subsample images
 images_sub <- images %>% slice_sample(n = n_img) 
 # keep plankton in sampled images

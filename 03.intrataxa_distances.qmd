@@ -19,18 +19,25 @@ execute:
 source("utils.R")
 ```
 
+::: {.callout-warning icon="false"}
+Work with a subsample of `r format(n_img, big.mark = ",")` images.
+:::
+
 ```{r read}
 ## Taxon of interest
-my_taxon <- "Acantharea"
-#my_taxon <- "Doliolida"
+#my_taxon <- "Acantharea"
+my_taxon <- "Doliolida"
 
-## All data
-images <- read_parquet(here("data/00.images_clean.parquet"))
-plankton <- read_parquet(here("data/00.plankton_clean.parquet"))
-
-## Subsample
-images <- images %>% slice_sample(n = 10000)
-plankton <- plankton %>% filter(img_name %in% images$img_name)
+## Subsampling
+if (sub_sample){
+  load("data/00.subsample.Rdata")
+  images <- images_sub
+  plankton <- plankton_sub
+} else {
+  ## All data
+  images <- read_parquet("data/00.images_clean.parquet")
+  plankton <- read_parquet("data/00.plankton_clean.parquet")
+}
 
 # list img names
 img_names <- sort(unique(images$img_name))
@@ -52,13 +59,11 @@ vol$y <- 2048
 vol$z <- 9572
 ```
 
-## Distances between all organisms of a given taxon
+## Number of objects per image for given taxon
 
 Get objects and images of the given taxon.
 
-```{r}
-
-
+```{r n_obj}
 # Keep organisms of given taxa, only in images with > 1 organism
 t_plankton <- plankton %>% 
   filter(taxon == my_taxon) %>% 
@@ -66,20 +71,66 @@ t_plankton <- plankton %>%
   filter(n > 1) %>% 
   select(-n)
 
+# Images names
 img_names <- t_plankton %>% pull(img_name) %>% unique()
 
+# Images
 t_plankton_img <- images %>% filter(img_name %in% img_names)
 
-#counts <- plankton %>% 
-#  group_by(img_name) %>% 
-#  summarise(n = sum(taxon == my_taxon)) %>% 
-#  ungroup()
-
-
+# Counts per image
+counts <- t_plankton %>% count(img_name)
+counts %>% 
+  ggplot() +
+  geom_histogram(aes(x = n))
 
 ```
 
-```{r app}
+## Null data for given taxon
+
+Let’s generate images with a similar distribution of number of objects per image.
+
+```{r n_pts}
+# The number of images to generate is now limited by the number of images with the given taxon
+n_img <- min(n_img, nrow(counts))
+n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
+```
+
+Generate images with these number of points.
+
+```{r pick_rand}
+# Pick random points within image volumes
+rand_points <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores)
+
+# Store this in a df
+rand_points <- do.call(bind_rows, rand_points)
+
+```
+
+Compute distances between random objects.
+
+```{r rand_dist}
+# Loop over images and compute distances between all points within each image
+dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+
+# Plot all
+ggplot(dist_all_rand) + 
+  geom_density(aes(x = dist)) +
+  labs(title = "Density distribution of distances for a random distribution")
+```
+
+## Compute distances between all objects of given taxon
+
+```{r dist_all}
 # Loop over images and compute distances between all points within each image
 dist_all <- compute_all_dist(t_plankton, n_cores = n_cores)
 
@@ -89,59 +140,38 @@ ggplot(dist_all) +
 
 ```
 
-Compare with null data
+## Compare with null data
+
+::: {.callout-warning icon="false"}
+Subsample to `r n_dist` distances for computations.
+:::
 
 ```{r plot_ecdf}
 df_dist <- bind_rows(
-  dist_all %>% select(dist) %>% mutate(data = my_taxon),
-  dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = nrow(dist_all)))
+  dist_all %>% select(dist) %>% mutate(data = my_taxon) %>% slice_sample(n = n_dist),
+  dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
+)
+  
 
-df_dist %>% 
-  #slice_sample(n = 10000) %>% 
+df_dist %>%   
   ggplot(aes(dist, colour = data)) +
-  stat_ecdf(geom = "step") 
+  stat_ecdf(geom = "step")
 ```
 
-```{r}
-s1 <-  sample(df_dist %>% filter(data == my_taxon) %>% pull(dist))
-s2 <-  sample(df_dist %>% filter(data == "null") %>% pull(dist))
+```{r compare}
+s1 <-  df_dist %>% filter(data == my_taxon) %>% pull(dist)
+s2 <-  df_dist %>% filter(data == "null") %>% pull(dist)
 out <-  kuiper_test(s1, s2)
 out
 summary(out)
 plot(out)
 ```
 
-::: {.callout-important icon="false"}
-TODO: generate null data
-:::
+## Complete spatial randomness test based on quadrats
 
-```{r}
-counts <- t_plankton %>% count(img_name) 
+Let’s perform a test of complete spatial randomness (CSR) based on quadrat counts for each image.
 
-ggplot(counts) + geom_histogram(aes(x = n))
-```
-
-```{r}
-# Fit a lognormal law
-fit_params <- fitdistr(counts$n,"lognormal")
-
-# Sample the law
-n_img <-  nrow(counts)
-sample <- tibble(
-  n = rlnorm(n_img, fit_params$estimate['meanlog'], fit_params$estimate['sdlog'])
-  ) %>% 
-  mutate(n = round(n)) # round number of objects
-
-# Plot samples from fitted law VS data, focusing on relatively low values
-ggplot() + 
-  geom_histogram(data = counts, aes(x = n)) +
-  geom_histogram(data = sample, aes(x = n), colour = "red") 
-
-```
-
-## Quadrat test
-
-```{r}
+```{r quadrats}
 # 1 image = 5 square frames
 # we can do 10 quadrats in x and 2 in y: square quadraits, 20 per image
 nx <- 10 # quadrats in x dimension
@@ -161,7 +191,7 @@ qt_all <- mclapply(img_names, function(name) {
   points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
   
   # Perform quadrat test and extract p-value
-  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo")
+  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo", conditional = TRUE)
   
   # Store results in a tibble and return it
   tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)
@@ -174,10 +204,7 @@ df_qt <- do.call(bind_rows, qt_all) %>%
 summary(df_qt)
 ```
 
-```{r}
+```{r plot_p_val}
 ggplot(df_qt) + geom_histogram(aes(x = p_value), bins = 100)
-```
-
-```{r}
 ggplot(df_qt) + geom_density_2d(aes(x = n_obj, y = p_value))
 ```

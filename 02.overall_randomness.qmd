@@ -20,19 +20,22 @@ source("utils.R")
 ```
 
 ::: {.callout-warning icon="false"}
-Work with a subsample of the data: 10,000 images.
+Work with a subsample of the data: `r format(n_img, big.mark = ",")` images.
 :::
 
 ```{r read}
 #| cache.lazy: false
 
-## All data
-images <- read_parquet(here("data/00.images_clean.parquet"))
-plankton <- read_parquet(here("data/00.plankton_clean.parquet"))
-
-## Subsample
-images <- images %>% slice_sample(n = 10000)
-plankton <- plankton %>% filter(img_name %in% images$img_name)
+## Subsampling
+if (sub_sample){
+  load("data/00.subsample.Rdata")
+  images <- images_sub
+  plankton <- plankton_sub
+} else {
+  ## All data
+  images <- read_parquet("data/00.images_clean.parquet")
+  plankton <- read_parquet("data/00.plankton_clean.parquet")
+}
 
 # list img names
 img_names <- sort(unique(images$img_name))
@@ -61,9 +64,9 @@ To investigate overall randomness, let’s compute distances between all pairs o
 dist_all <- compute_all_dist(plankton, n_cores = n_cores)
 
 # Plot all
-ggplot(dist_all) + 
-  geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
-  geom_density(aes(x = dist))
+#ggplot(dist_all) + 
+#  geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
+#  geom_density(aes(x = dist))
 
 ggplot(dist_all) + 
   geom_density(aes(x = dist))
@@ -73,12 +76,18 @@ ggplot(dist_all) +
 
 Plot ECDF for null distances and all data. Subsample to 10000 points for computations.
 
+::: {.callout-warning icon="false"}
+Subsample to `r format(n_dist, big.mark = ",")` distances for computation.
+:::
+
 ```{r plot_ecdf}
-bind_rows(
-  dist_all %>% select(dist) %>% mutate(data = "all"),
-  dist_all_rand %>% select(dist) %>% mutate(data = "null")
-) %>% 
-  slice_sample(n = 10000) %>% 
+df_dist <- bind_rows(
+  dist_all %>% select(dist) %>% mutate(data = "all") %>% slice_sample(n = n_dist),
+  dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
+)
+  
+
+df_dist %>%   
   ggplot(aes(dist, colour = data)) +
   stat_ecdf(geom = "step")
 ```
@@ -88,8 +97,8 @@ This looks very similar…
 Perform Kuiper test on a subsample
 
 ```{r compare}
-s1 <-  sample(dist_all$dist, size = 10000)
-s2 <-  sample(dist_all_rand$dist, size = 10000)
+s1 <-  df_dist %>% filter(data == "all") %>% pull(dist)
+s2 <-  df_dist %>% filter(data == "null") %>% pull(dist)
 out <-  kuiper_test(s1, s2)
 out
 summary(out)
@@ -130,7 +139,7 @@ qt_all <- mclapply(img_names, function(name) {
   points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
   
   # Perform quadrat test and extract p-value
-  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo")
+  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo", conditional = TRUE)
   
   # Store results in a tibble and return it
   tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)

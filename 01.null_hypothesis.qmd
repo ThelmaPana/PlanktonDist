@@ -21,12 +21,21 @@ source("utils.R")
 
 ```{r read}
 #| cache.lazy: false
-## All data
-images <- read_parquet("data/00.images_clean.parquet")
-plankton <- read_parquet("data/00.plankton_clean.parquet")
+
+## Subsampling
+if (sub_sample){
+  load("data/00.subsample.Rdata")
+  images <- images_sub
+  plankton <- plankton_sub
+} else {
+  ## All data
+  images <- read_parquet("data/00.images_clean.parquet")
+  plankton <- read_parquet("data/00.plankton_clean.parquet")
+}
 
 # list img names
 img_names <- sort(unique(images$img_name))
+
 ```
 
 Define window size for point pattern analysis.
@@ -49,26 +58,10 @@ counts <- plankton %>% count(img_name)
 ggplot(counts) + geom_histogram(aes(x = n), bins = 100)
 ```
 
-This looks like a lognormal law, let’s try fitting this. Then, we can draw a given number of images from this law (e.g. `n_img = 1000`) and this will give us a number of objects within each image that is representative of the dataset. Still, we need to round the number of objects.
+Let’s generate `r n_img` images with a similar distribution of number of objects per image.
 
-```{r fit_law}
-#| warning: false
-
-# Fit a lognormal law
-fit_params <- fitdistr(counts$n,"lognormal")
-
-# Sample the law
-n_img <- 1000
-sample <- tibble(
-  n = rlnorm(n_img, fit_params$estimate['meanlog'], fit_params$estimate['sdlog'])
-  ) %>% 
-  mutate(n = round(n)) # round number of objects
-
-# Plot samples from fitted law VS data, focusing on relatively low values
-ggplot() + 
-  geom_histogram(data = counts, aes(x = n), stat = "density") +
-  geom_density(data = sample, aes(x = n), colour = "red") +
-  xlim(0, 200)
+```{r n_pts}
+n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
 ```
 
 ## Distances between random objects
@@ -79,7 +72,7 @@ Generate our random data.
 # Pick random points within image volumes
 rand_points <- mclapply(1:n_img, function(i){
   # Number of points to sample within image
-  n <- sample$n[i]
+  n <- n_pts[i]
   # Draw points
   d_points <- tibble(
     x = runif(n = n, min = 1, max = vol$x),
@@ -101,10 +94,6 @@ Compute and plot distances between all objects within each image.
 dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
 
 # Plot all
-ggplot(dist_all_rand) + 
-  geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
-  geom_density(aes(x = dist))
-
 ggplot(dist_all_rand) + 
   geom_density(aes(x = dist)) +
   labs(title = "Density distribution of distances for a random distribution")
