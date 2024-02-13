@@ -129,7 +129,8 @@ df_intra_dist <- df_intra %>%
   pivot_longer(c(dist, dist_rand)) %>% 
   mutate(value = map(value, `length<-`, max(lengths(value)))) %>% 
   pivot_wider(names_from = name, values_from = value) %>% 
-  unnest(c(dist, dist_rand))
+  unnest(c(dist, dist_rand)) %>% 
+  select(taxon, dist, dist_rand)
 
 # One small df with summary
 df_intra <- df_intra %>% select(-c(dist, dist_rand))

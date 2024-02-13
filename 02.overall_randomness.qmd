@@ -107,6 +107,32 @@ plot(out)
 
 … and indeed it is similar!
 
+Save the results
+
+```{r save}
+# Store into two tables
+# one small summary
+df_all <- tibble(
+  taxon = "all",
+  n_obj = nrow(plankton),
+  n_img = nrow(images),
+  test_stat = out[1],
+  p_value = out[2]
+)
+
+# one big with distances
+df_all_dist <- tibble(
+  taxon = "all",
+  dist = df_dist %>% filter(data != "null") %>% pull(dist),
+  dist_rand = df_dist %>% filter(data == "null") %>% pull(dist)
+)
+
+# Save
+save(df_all, df_all_dist, file = "data/02.all_distances.Rdata")
+
+
+```
+
 ::: {.callout-note icon="false"}
 ## Conclusion
 
