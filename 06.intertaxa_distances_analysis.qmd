@@ -1,0 +1,93 @@
+---
+title: "Analyze intertaxonomic distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+Load computed distances.
+
+```{r load}
+# intertaxa
+load("data/05.inter_distances.Rdata")
+
+# Overall
+load("data/02.all_distances.Rdata")
+
+```
+
+Plot test stat
+
+```{r}
+toto <- df_inter %>% 
+  filter(str_detect(pair, "Acant")) %>% 
+  filter(str_detect(pair, "App"))
+
+titi <- df_inter_dist %>% 
+  filter(str_detect(pair, "Acant")) %>% 
+  filter(str_detect(pair, "App"))
+toto
+```
+
+```{r}
+titi %>% 
+  pivot_longer(c(dist, dist_rand), values_to = "dist") %>% 
+  mutate(data = ifelse(name == "dist_rand", "null", "pair")) %>% 
+  ggplot() + 
+  stat_ecdf(aes(x = dist, colour = data)) +
+  facet_wrap(~pair)
+```
+
+```{r}
+titi %>% 
+  ggplot() + 
+  stat_ecdf(aes(x = dist, colour = pair)) +
+  labs(title = "Distances for pair")
+```
+
+```{r}
+titi %>% 
+  ggplot() + 
+  stat_ecdf(aes(x = dist_rand, colour = pair)) +
+  labs(title = "Random distances for pair")
+```
+
+```{r}
+df_inter %>% 
+  filter(str_detect(pair, "Acant")) %>% 
+  ggplot() +
+  geom_col(aes(x = pair, y = test_stat, fill = n_img)) +
+  geom_hline(yintercept = df_all$test_stat, colour = "red") +
+  scale_fill_viridis_c(trans = "log10") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+df_inter %>% 
+  ggplot() +
+  geom_col(aes(x = taxon, y = test_stat, fill = n_obj)) +
+  geom_hline(yintercept = df_all$test_stat, colour = "red") +
+  scale_fill_viridis_c(trans = "log10") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+df_inter %>% 
+  ggplot() +
+  geom_col(aes(x = taxon, y = p_value, fill = n_img)) +
+  scale_fill_viridis_c(trans = "log10") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```

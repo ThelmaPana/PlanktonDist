@@ -74,6 +74,72 @@ coast <- read_csv(file.path(data_dir, "raw/coast.csv"), show_col_types = FALSE)
 
 ## Functions ----
 #--------------------------------------------------------------------------#
+
+#' Compute distances between individuals of two taxonomic groups within an ensemble of images
+#' 
+#' In each image, the distance between all unique pairs of points is computed.
+#'
+#' @param points dataframe with columns `x` and `y` for point position, `img_name` for image reference and `taxon` for taxonomic groups
+#' @param n_cores number of cores to use for parallel processing
+#' @param z_dim whether to consider 3rd dimension (`z`)
+#'
+#' @return a dataframe with all distances for each image
+#' 
+compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
+  dist_all <- mclapply(unique(points$img_name), function(name) {
+    
+    # Get points within image, split dataframe by taxon
+    if (z_dim){ # 3D case
+      points_img <-  points %>% 
+        filter(img_name == name) %>% 
+        select(taxon, x, y, z) %>% 
+        group_by(taxon) %>% 
+        group_split(.keep = F)
+    } else { # 2D case
+      points_img <- points %>% 
+        filter(img_name == name) %>% 
+        select(taxon, x, y) %>% 
+        group_by(taxon) %>% 
+        group_split(.keep = F)
+    }
+    
+    # Use proxy::dist to compute distances between two matrices
+      dist_all <- proxy::dist(points_img[[1]], points_img[[2]])
+      dist_all <- `dim<-`(c(dist_all), dim(dist_all))
+      dist_all <- dist_all %>% 
+        melt(varnames = c("p1", "p2")) %>% 
+        as_tibble() %>% 
+        rename(dist = value) %>% 
+        mutate(img_name = name)
+    
+    return(dist_all)
+   }, mc.cores = n_cores)
+  
+  # Combine results in a dataframe
+  dist_all <- do.call(bind_rows, dist_all)
+
+  # Check that we have the number of expected distances within each image
+  # Number of distances in each image
+  dist_ok <- dist_all %>% 
+    count(img_name, name = "n_dist") %>% 
+    # Join with theoretical number of distances for each image
+    left_join(
+      points %>% 
+        count(img_name, taxon) %>% 
+        group_by(img_name) %>% 
+        summarise(n_dist_th = prod(n)),
+      by = join_by(img_name)
+    ) %>% 
+    mutate(ok = n_dist == n_dist_th)
+    
+  if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points and their type.")} # should return TRUE
+  
+  return(dist_all)
+}
+
+
+
+
 #' Compute distances between all points within an ensemble of images
 #' 
 #' In each image, the distance between all unique pairs of points is computed.
@@ -128,8 +194,6 @@ compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
   
   return(dist_all)
 }
-
-
 
 #' Resampling procedure for  edges probability
 #'
