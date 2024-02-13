@@ -5,6 +5,7 @@
 # Author: Thelma Panaïotis
 #--------------------------------------------------------------------------#
 
+
 ## Set-up and read data ----
 #--------------------------------------------------------------------------#
 source("utils.R")
@@ -24,8 +25,6 @@ if (sub_sample){
 # list img names
 img_names <- sort(unique(images$img_name))
 
-plankton %>% count(taxon) %>% arrange(n)
-
 
 # list taxa
 taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
@@ -33,16 +32,8 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 
 ## Loop over taxa ----
 #--------------------------------------------------------------------------#
-res <- c()
-res$taxon <- c()
-res$dist <- c()
-res$rand <- c()
-res$test_stat <- c()
-res$p_value <- c()
 
-for (my_taxon in taxa) {
-  print(my_taxon)
-  #my_taxon <- taxa[1]
+res <- mclapply(taxa, function(my_taxon){
   
   ## Taxon set-up, number of objects per image
   # Keep organisms of given taxa, only in images with > 1 organism
@@ -58,17 +49,13 @@ for (my_taxon in taxa) {
     # Images names
     t_img_names <- t_plankton %>% pull(img_name) %>% unique()
     
-    # Images
-    t_plankton_img <- images %>% filter(img_name %in% t_img_names)
-    
     # Counts per image
     t_counts <- t_plankton %>% count(img_name)
     
     
     # The number of images to generate is now limited by the number of images with the given taxon
     t_n_img <- min(n_img, nrow(t_counts))
-    n_pts <-
-      t_counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
+    n_pts <- t_counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
     
     
     ## Generate random data for given taxon
@@ -105,6 +92,7 @@ for (my_taxon in taxa) {
       dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
     )
     
+    # Plot
     p <- df_dist %>%
       ggplot(aes(dist, colour = data)) +
       stat_ecdf(geom = "step")
@@ -114,69 +102,81 @@ for (my_taxon in taxa) {
     s2 <-  df_dist %>% filter(data == "null") %>% pull(dist)
     out <-  kuiper_test(s1, s2)
     
-    # Save outputs
-    res$taxon     <- c(res$taxon, my_taxon)
-    res$dist      <- c(res$dist, dist_all$dist)
-    res$rand_dist <- c(res$dist, dist_all_rand$dist)
-    res$test_stat <- c(res$test_stat, out[1])
-    res$p_value     <- c(res$p_value, out[2])
-    
+    # Return outputs
+    tibble(
+      taxon = my_taxon,
+      n_org = nrow(t_plankton),
+      n_img = length(t_img_names),
+      test_stat = out[1],
+      p_value = out[2],
+      #plot = list(p),
+      dist = list(dist_all %>% slice_sample(n = n_dist) %>% pull(dist)),
+      dist_rand = list(dist_all_rand %>% slice_sample(n = n_dist) %>% pull(dist) ),
+    )
+
   }  
-}
-
-
-df_res <- tibble(
-  taxon = res$taxon, 
-  test_stat = res$test_stat,
-  p_value = res$p_value
-)
-
-df_res
-
-
-## Plot results ----
-#--------------------------------------------------------------------------#
-res
-
-
-
-
-
-
-## ----quadrats--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# 1 image = 5 square frames
-# we can do 10 quadrats in x and 2 in y: square quadraits, 20 per image
-nx <- 10 # quadrats in x dimension
-ny <- 2  # quadrats in y dimension
-
-# p-value threshold for randomness
-thres <- 0.01
-
-# Loop over images and perform the quadrat test in each one
-qt_all <- mclapply(img_names, function(name) {
-  # Get points within image
-  points <- t_plankton %>% 
-    filter(img_name == name) %>% 
-    select(x, y)
-  
-  # Convert to ppp
-  points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
-  
-  # Perform quadrat test and extract p-value
-  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo", conditional = TRUE)
-  
-  # Store results in a tibble and return it
-  tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)
 }, mc.cores = n_cores)
 
-# Transform list to one tibble
-df_qt <- do.call(bind_rows, qt_all) %>% 
-  # distribution is random if p_value > thres
-  mutate(random = ifelse(p_value < thres, FALSE, TRUE))
-summary(df_qt)
+# Combine into a tibble
+df_intra <- do.call(bind_rows, res)
 
 
-## ----plot_p_val------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ggplot(df_qt) + geom_histogram(aes(x = p_value), bins = 100)
-ggplot(df_qt) + geom_density_2d(aes(x = n_obj, y = p_value))
+## Reformat results ----
+#--------------------------------------------------------------------------#
+# One big df with distances
+df_intra_dist <- df_intra %>% 
+  pivot_longer(c(dist, dist_rand)) %>% 
+  mutate(value = map(value, `length<-`, max(lengths(value)))) %>% 
+  pivot_wider(names_from = name, values_from = value) %>% 
+  unnest(c(dist, dist_rand))
+
+# One small df with summary
+df_intra <- df_intra %>% select(-c(dist, dist_rand))
+
+
+## Save results ----
+#--------------------------------------------------------------------------#
+
+save(df_intra, df_intra_dist, file = "data/03.intra_distances.Rdata")
+
+
+
+
+
+### ----quadrats--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## 1 image = 5 square frames
+## we can do 10 quadrats in x and 2 in y: square quadraits, 20 per image
+#nx <- 10 # quadrats in x dimension
+#ny <- 2  # quadrats in y dimension
+#
+## p-value threshold for randomness
+#thres <- 0.01
+#
+## Loop over images and perform the quadrat test in each one
+#qt_all <- mclapply(img_names, function(name) {
+#  # Get points within image
+#  points <- t_plankton %>% 
+#    filter(img_name == name) %>% 
+#    select(x, y)
+#  
+#  # Convert to ppp
+#  points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
+#  
+#  # Perform quadrat test and extract p-value
+#  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo", conditional = TRUE)
+#  
+#  # Store results in a tibble and return it
+#  tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)
+#}, mc.cores = n_cores)
+#
+## Transform list to one tibble
+#df_qt <- do.call(bind_rows, qt_all) %>% 
+#  # distribution is random if p_value > thres
+#  mutate(random = ifelse(p_value < thres, FALSE, TRUE))
+#summary(df_qt)
+#
+#
+### ----plot_p_val------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#ggplot(df_qt) + geom_histogram(aes(x = p_value), bins = 100)
+#ggplot(df_qt) + geom_density_2d(aes(x = n_obj, y = p_value))
 
