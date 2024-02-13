@@ -1,0 +1,43 @@
+---
+title: "Analyze intrataxonomic distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+Load computed distances.
+
+```{r load}
+load("data/03.intra_distances.Rdata")
+```
+
+Plot test stat
+
+```{r}
+df_intra %>% 
+  ggplot() +
+  geom_col(aes(x = taxon, y = test_stat, fill = n_img)) +
+  scale_fill_viridis_c(trans = "log10") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+df_intra %>% 
+  ggplot() +
+  geom_col(aes(x = taxon, y = test_stat, fill = n_org)) +
+  scale_fill_viridis_c(trans = "log10") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```

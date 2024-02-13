@@ -86,16 +86,17 @@ res <- mclapply(taxa, function(my_taxon){
     
     
     ## Comparison with null data
-    # ECDF
-    df_dist <- bind_rows(
-      dist_all %>% select(dist) %>% mutate(data = my_taxon) %>% slice_sample(n = n_dist),
-      dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
-    )
-    
-    # Plot
-    p <- df_dist %>%
-      ggplot(aes(dist, colour = data)) +
-      stat_ecdf(geom = "step")
+    # Store distances and null distances together
+    if (sub_sample){
+      df_dist <- bind_rows(
+        dist_all %>% select(dist) %>% mutate(data = my_taxon) %>% slice_sample(n = n_dist),
+        dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
+      )
+    } else {
+      df_dist <- bind_rows(
+        dist_all %>% select(dist) %>% mutate(data = my_taxon),
+        dist_all_rand %>% select(dist) %>% mutate(data = "null"))
+    }
     
     # Kuiper-test
     s1 <-  df_dist %>% filter(data == my_taxon) %>% pull(dist)
@@ -105,17 +106,17 @@ res <- mclapply(taxa, function(my_taxon){
     # Return outputs
     tibble(
       taxon = my_taxon,
-      n_org = nrow(t_plankton),
-      n_img = length(t_img_names),
+      n_obj = nrow(t_plankton),
+      n_img = t_n_img,
       test_stat = out[1],
       p_value = out[2],
-      #plot = list(p),
-      dist = list(dist_all %>% slice_sample(n = n_dist) %>% pull(dist)),
-      dist_rand = list(dist_all_rand %>% slice_sample(n = n_dist) %>% pull(dist) ),
+      dist = list(df_dist %>% filter(data != "null") %>% pull(dist)),
+      dist_rand = list(df_dist %>% filter(data == "null") %>% pull(dist)),
     )
 
   }  
 }, mc.cores = n_cores)
+
 
 # Combine into a tibble
 df_intra <- do.call(bind_rows, res)
