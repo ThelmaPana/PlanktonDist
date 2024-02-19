@@ -22,7 +22,8 @@ plankton <- plankton %>%
   select(
     transect, img_name, object_id = id, taxon,
     datetime, lat, lon, dist, depth,
-    x = centroid_1, y = centroid_0,
+    x = centroid_1, y = centroid_0, # positional data
+    contains("bbox") # for height and width
   ) %>% 
   # join with cops
   left_join(cops %>% select(object_id, new_taxon = taxon), by = join_by(object_id)) %>% 
@@ -41,6 +42,17 @@ plankton <- plankton %>%
   rename(taxon = new_taxon) %>% 
   # drop objects that should be ignored
   drop_na(taxon)
+
+
+## Compute height and width ----
+#--------------------------------------------------------------------------#
+plankton <- plankton %>% 
+  mutate(
+    width = bbox_3 - bbox_1,
+    height = bbox_2 - bbox_0,
+    .after = y
+  ) %>% 
+  select(-contains("bbox"))
 
 
 ## Keep only images with more than 1 object ----

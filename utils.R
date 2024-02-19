@@ -4,6 +4,7 @@ suppressWarnings(library(tidyverse))
 suppressWarnings(library(here))
 suppressWarnings(library(reshape2))
 suppressWarnings(library(parallel))
+suppressWarnings(library(hms))
 
 # Null hypothesis
 suppressWarnings(library(MASS))
@@ -74,6 +75,19 @@ coast <- read_csv(file.path(data_dir, "raw/coast.csv"), show_col_types = FALSE)
 
 ## Functions ----
 #--------------------------------------------------------------------------#
+# Function to increment file numbers in batch
+increment_files <- function(to_increment){
+  # List files with this number
+  to_rename <- list.files(pattern = paste0(to_increment, ".*"))
+  
+  # Compute new number and generate new file names
+  new_nb <- as.character(as.numeric(to_increment) + 1) %>% str_pad(width = 2, pad = "0")
+  renamed <- str_replace_all(to_rename, pattern = to_increment, replacement = new_nb)
+  
+  # Rename files
+  file.rename(from = to_rename, to = renamed)
+}
+
 
 #' Compute distances between individuals of two taxonomic groups within an ensemble of images
 #' 
