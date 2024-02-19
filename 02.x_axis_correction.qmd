@@ -25,6 +25,17 @@ source("utils.R")
 #| cache: false
 
 import pandas as pd
+import numpy as np
+import os
+import tarfile
+import cv2
+import matplotlib.pyplot as plt
+
+# Path to apeep processed data
+apeep_path = '/home/tpanaiotis/complex/visufront/apeep_processed'
+
+# Path to write images
+vig_path = 'data/solitary_collodaria/images'
 ```
 
 ## Extract solitary collodaria and prepare Ecotaxa import
@@ -47,7 +58,7 @@ img_names <- sort(unique(images$img_name))
 
 ```
 
-### Prepare table for Ecotaxa 
+### Prepare table for Ecotaxa
 
 First, we need to prepare some new columns.
 
@@ -56,9 +67,11 @@ plankton <- plankton %>%
   mutate(
     # Date and time as YYYYMMDD and HHMMSS
     date = datetime %>% as_date() %>% as.character() %>% str_replace_all("-", ""),
-    time = datetime %>% as.hms() %>% as.character() %>% str_replace_all(":", ""),
+    time = datetime %>% as_hms() %>% as.character() %>% str_replace_all(":", ""),
     depth_max = depth, # for depth_max
-    img_file_name = paste0(object_id, ".png")
+    # path to vignette
+    img_file_name = paste("images", img_name, paste0(object_id, ".png"), sep = "/"),
+    transect = str_remove_all(transect, "0") # remove "0" in transect name
   ) %>% 
   select(
     # select relevant columns and rename
@@ -83,41 +96,94 @@ plankton <- plankton %>%
 Now move to python to add header row and save as tsv.
 
 ```{python first_row}
-df_ecotaxa = r.plankton
-
-# add first row, containing data format codes; [f] for floats, [t] for text
-# initiate first_row as floats
-first_row = ['[f]'] * (df_ecotaxa.shape[1])
-
-# list of possible columns with data format as text [t]
-as_text = [
-    'img_file_name',
-    'object_id',
-    'sample_id',
-    'process_id'
-]
-
-# for columns in particles_props and with text format, change first row to [t]
-col_ind_text = [df_ecotaxa.columns.get_loc(col) for col in list(set(df_ecotaxa.columns) & set(as_text))]
-for i in col_ind_text:
-    first_row[i] = '[t]'
-    
-# first_row as Dataframe row with appropriate headers
-first_row = pd.DataFrame(first_row).T
-first_row.columns = df_ecotaxa.columns
-
-# concat first_row and dataframe
-df_ecotaxa = pd.concat([first_row, df_ecotaxa], ignore_index = True)
-
-## Save as tsv file
-
-df_ecotaxa.to_csv('data/ecotaxa_solitary_collodaria.tsv', index = False, sep = '\t', header = True)
+run = True
+if run:
+  df = r.plankton
+  
+  # add first row, containing data format codes; [f] for floats, [t] for text
+  # initiate first_row as floats
+  first_row = ['[f]'] * (df.shape[1])
+  
+  # list of possible columns with data format as text [t]
+  as_text = [
+      'img_file_name',
+      'object_id',
+      'sample_id',
+      'process_id'
+  ]
+  
+  # for columns in particles_props and with text format, change first row to [t]
+  col_ind_text = [df.columns.get_loc(col) for col in list(set(df_ecotaxa.columns) & set(as_text  ))]
+  for i in col_ind_text:
+      first_row[i] = '[t]'
+      
+  # first_row as Dataframe row with appropriate headers
+  first_row = pd.DataFrame(first_row).T
+  first_row.columns = df.columns
+  
+  # concat first_row and dataframe
+  df_ecotaxa = pd.concat([first_row, df], ignore_index = True)
+  
+  ## Save as tsv file
+  df_ecotaxa.to_csv('data/solitary_collodaria/ecotaxa_solitary_collodaria.tsv', index = False,   sep = '\t', header = True)
 ```
 
 Now that the table is ready, we have to prepare images.
 
 ### Prepare images
 
-```{python}
+::: {.callout-note icon="false"}
+This part is to be run at LOV only (because images are at LOV).
+:::
 
+```{python move_images}
+run = True
+if run:
+  df['img_path'] = df['sample_id'] + '/particles/' + df['process_id']
+  df = df.sort_values(by = 'img_path').reset_index(drop = True)
+  
+  # put this in a list
+  img_path = df['img_path'].tolist()
+  # drop duplicates
+  img_path = list(set(img_path))
+  img_path.sort()
+  
+  for i, p in enumerate(img_path):
+      # progress flag
+      if i + 1 % 1000 == 0:
+          print(f'Done with {i+1} out of {len(img_path)}')
+          
+      # get concerned vignettes
+      vig_name = df[df['img_path'] == p].object_id.tolist()
+      vig_name = [v + '.png' for v in vig_name]
+      
+      # Open tar file
+      tar = tarfile.open(name = os.path.join(apeep_path, p + '.tar'), mode='r')
+      # Get names of all vignettes
+      all_vigs = tar.getnames()
+      all_vigs = [x for x in all_vigs if 'png' in x]
+      
+      # Get names of vignettes to extract
+      vig_name = [p for p in all_vigs if os.path.basename(p) in vig_name]
+      
+      # Loop over vignettes to process
+      for v in vig_name:
+      
+          # Read vignette as image
+          vignette = tar.extractfile(v)
+          vignette = vignette.read()
+          vignette = cv2.imdecode(
+              np.asarray(
+                  bytearray(
+                      vignette
+                  ), dtype=np.uint8
+              ), 0
+          )/255
+          
+          # Save image as png
+          os.makedirs(os.path.join(vig_path, os.path.basename(p)), exist_ok = True)
+          _ = cv2.imwrite(
+              filename = os.path.join(vig_path, os.path.basename(p), os.path.basename(v)), 
+              img = (vignette * 255).astype(np.uint8)
+          )
 ```
