@@ -5,6 +5,8 @@ suppressWarnings(library(here))
 suppressWarnings(library(reshape2))
 suppressWarnings(library(parallel))
 suppressWarnings(library(hms))
+suppressWarnings(library(ecotaxarapi))
+
 
 # Null hypothesis
 suppressWarnings(library(MASS))
