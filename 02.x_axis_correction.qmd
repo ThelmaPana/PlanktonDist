@@ -23,6 +23,7 @@ source("utils.R")
 ```{python py_set_up}
 #| echo: false
 #| cache: false
+#| eval: false
 
 import pandas as pd
 import numpy as np
@@ -215,7 +216,8 @@ sol_col <- o$details %>%
 sol_col <- sol_col %>% 
   left_join(plankton, by = join_by(object_id)) %>% 
   filter(transect_new == str_remove_all(transect, "0")) %>%  # make sure that transects are ok
-  select(transect, img_name:taxon, group)
+  select(transect, img_name:taxon, group) %>% 
+  mutate(ratio = height/width)
 ```
 
 ```{r}
@@ -223,4 +225,34 @@ sol_col %>%
   ggplot() +
   geom_point(aes(x = width, y = height, colour = group)) +
   geom_abline(slope = 1, intercept = 0)
+```
+
+```{r}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 7
+sol_col %>% 
+  filter(group == "solitaryblack") %>% 
+  ggplot() +
+  geom_point(aes(x = dist,  y = -depth, colour = ratio)) +
+  scale_colour_viridis_c() +
+  facet_wrap(~transect, scales = "free")
+```
+
+```{r}
+sol_col %>% 
+  filter(group == "solitaryblack") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = 0, y = ratio)) +
+  facet_wrap(~transect, nrow = 2)
+```
+
+```{r}
+sol_col %>% 
+  filter(group == "solitaryblack") %>% 
+  arrange(datetime) %>% 
+  ggplot() +
+  geom_path(aes(x = datetime, y = ratio)) +
+  facet_wrap(~transect, scales = "free")
 ```
