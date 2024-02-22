@@ -18,6 +18,7 @@ execute:
 #| echo: false
 #| cache: false
 source("utils.R")
+load("data/01.null_data.Rdata")
 ```
 
 ```{python py_set_up}
@@ -234,6 +235,9 @@ sol_col %>%
 #| fig-height: 7
 sol_col %>% 
   filter(group == "solitaryblack") %>% 
+  group_by(transect, img_name, datetime, lat, lon, dist, depth) %>% 
+  summarise(ratio = mean(ratio)) %>% 
+  ungroup() %>% 
   ggplot() +
   geom_point(aes(x = dist,  y = -depth, colour = ratio)) +
   scale_colour_viridis_c() +
@@ -249,10 +253,75 @@ sol_col %>%
 ```
 
 ```{r}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 5
 sol_col %>% 
   filter(group == "solitaryblack") %>% 
+  group_by(transect, img_name, datetime, lat, lon, dist, depth) %>% 
+  summarise(ratio = mean(ratio)) %>% 
+  ungroup() %>% 
   arrange(datetime) %>% 
   ggplot() +
   geom_path(aes(x = datetime, y = ratio)) +
-  facet_wrap(~transect, scales = "free")
+  facet_wrap(~transect, scales = "free_x", nrow = 4)
+```
+
+## Apply to null data
+
+Compare error in `z` to error in `x`.
+
+```{r}
+
+
+toto <- rand_points %>% filter(img_name == "img_00001")
+
+corr_factor <- mean(sol_col$ratio) # just start with the mean
+
+
+x <- toto$x
+y <- sol_col$ratio
+apply_corr <- function(x, y){
+  y_sum <- summary(y)
+  res <- x %*% t(unname(y_sum)) %>% 
+    as.data.frame() %>% 
+    set_names(c("min", "q1", "med", "mean", "q3", "max"))
+  
+  
+  return(res)
+}
+
+as.data.frame(res) %>% 
+  set_names(c("min", "q1", "med", "mean", "q3", "max"))
+
+
+
+titi <- toto %>% 
+  mutate(cors = apply_corr(x, sol_col$ratio)) %>% 
+  unnest_wider(cors)
+
+
+toto$x
+foo <- apply_corr(toto$x, sol_col$ratio)
+
+# Apply correction
+titi <- toto %>% mutate(x = x * corr_factor)
+
+toto %>% 
+  left_join(titi %>% rename(x_corr = x), by = join_by(y, z, img_name)) %>% 
+  pivot_longer(c(x,x_corr)) %>% 
+  ggplot() +
+  geom_point(aes(x = value, y = y, color = name)) +
+  coord_fixed()
+
+
+dist_all <- compute_all_dist(toto)
+dist_all_corr <- compute_all_dist(titi)
+
+dist_all %>% 
+  left_join(dist_all_corr %>% rename(dist_corr = dist), by = join_by(p1, p2, img_name)) %>% 
+  ggplot() + 
+  geom_point(aes(x = dist, y = dist_corr)) + 
+  geom_abline(slope = 1, intercept = 0, colour = "red")
 ```
