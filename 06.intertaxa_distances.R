@@ -1,3 +1,4 @@
+#/usr/local/bin/R
 #--------------------------------------------------------------------------#
 # Project: PlanktonDist
 # Script purpose: Compute intertaxa distances for all pairs of taxa
@@ -37,6 +38,9 @@ pairs <- pairs %>% slice_head(n = 100)
 ## Loop over pairs ----
 #--------------------------------------------------------------------------#
 
+j = 3
+j = 85
+
 # Use indices instead of taxa
 res <- mclapply(1:nrow(pairs), function(j){
   
@@ -69,15 +73,17 @@ res <- mclapply(1:nrow(pairs), function(j){
     # The number of images to generate is now limited by the number of images with both given taxon
     t_n_img <- min(n_img, nrow(img_both))
     
-    n_pts <- t_counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
+   #n_pts <- t_img_names %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
     
     
     ## Generate random data for given taxon
     # Pick random points within image volumes
     rand_points <- mclapply(1:t_n_img, function(i) {
+      set.seed(seed)
       # Number of points to sample within image
       n1 <- img_both %>% slice(i) %>% pull(t1) # first taxon
       n2 <- img_both %>% slice(i) %>% pull(t2) # second taxon
+      
       n_tot <- n1 + n2 # total number of points
       # Draw points
       d_points <- tibble(
@@ -106,6 +112,7 @@ res <- mclapply(1:nrow(pairs), function(j){
     ## Comparison with null data
     # Store distances and null distances together
     if (sub_sample){
+      set.seed(seed)
       df_dist <- bind_rows(
         dist_all %>% select(dist) %>% mutate(data = my_pair_str) %>% slice_sample(n = n_dist),
         dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)

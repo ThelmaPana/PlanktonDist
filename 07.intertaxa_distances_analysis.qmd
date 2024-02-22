@@ -43,6 +43,10 @@ toto
 ```
 
 ```{r}
+titi
+```
+
+```{r}
 titi %>% 
   pivot_longer(c(dist, dist_rand), values_to = "dist") %>% 
   mutate(data = ifelse(name == "dist_rand", "null", "pair")) %>% 
@@ -66,6 +70,12 @@ titi %>%
 ```
 
 ```{r}
+s1 <- titi %>% filter(pair == "Acantharea - Appendicularia") %>% pull(dist_rand)
+s2 <- titi %>% filter(pair == "Appendicularia - Acantharea") %>% pull(dist_rand)
+kuiper_test(s1, s2)
+```
+
+```{r}
 df_inter %>% 
   filter(str_detect(pair, "Acant")) %>% 
   ggplot() +
@@ -78,7 +88,7 @@ df_inter %>%
 ```{r}
 df_inter %>% 
   ggplot() +
-  geom_col(aes(x = taxon, y = test_stat, fill = n_obj)) +
+  geom_col(aes(x = pair, y = test_stat, fill = n_obj)) +
   geom_hline(yintercept = df_all$test_stat, colour = "red") +
   scale_fill_viridis_c(trans = "log10") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -87,7 +97,7 @@ df_inter %>%
 ```{r}
 df_inter %>% 
   ggplot() +
-  geom_col(aes(x = taxon, y = p_value, fill = n_img)) +
+  geom_col(aes(x = pair, y = p_value, fill = n_img)) +
   scale_fill_viridis_c(trans = "log10") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```

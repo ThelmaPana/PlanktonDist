@@ -88,6 +88,7 @@ res <- mclapply(taxa, function(my_taxon){
     ## Comparison with null data
     # Store distances and null distances together
     if (sub_sample){
+      set.seed(seed)
       df_dist <- bind_rows(
         dist_all %>% select(dist) %>% mutate(data = my_taxon) %>% slice_sample(n = n_dist),
         dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
