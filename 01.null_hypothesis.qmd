@@ -101,3 +101,74 @@ ggplot(dist_all_rand) +
 # Save it
 save(dist_all_rand, rand_points, file = "data/01.null_data.Rdata")
 ```
+
+## Check that two independent sets of null data return the same results.
+
+```{r two_sets}
+# Pick random points within image volumes
+set_1 <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores)
+
+# Store this in a df
+set_1 <- do.call(bind_rows, set_1)
+
+# Pick random points within image volumes
+set_2 <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores)
+
+# Store this in a df
+set_2 <- do.call(bind_rows, set_2)
+
+
+## Compute distances
+dist_1 <- compute_all_dist(set_1, n_cores = n_cores)
+dist_2 <- compute_all_dist(set_2, n_cores = n_cores)
+```
+
+```{r two_sets_plot}
+foo <- bind_rows(
+  dist_1 %>% mutate(set = "1"),
+  dist_2 %>% mutate(set = "2")
+) 
+
+foo %>% 
+  ggplot() +
+  geom_density(aes(x = dist, colour = set)) +
+  labs(title = "Density distribution of distances for two random distributions")
+```
+
+```{r two_set_comp}
+bar <- bind_rows(
+  dist_1 %>% mutate(set = "1") %>% slice_sample(n = 10000),
+  dist_2 %>% mutate(set = "2") %>% slice_sample(n = 10000)
+) 
+
+bar %>% 
+  ggplot() +
+  stat_ecdf(aes(x = dist, colour = set)) +
+  labs(title = "ECDF of distances for two random distributions")
+
+
+s1 <- bar %>% filter(set == "1") %>% pull(dist)
+s2 <- bar %>% filter(set == "2") %>% pull(dist)
+
+kuiper_test(s1, s2)
+```
