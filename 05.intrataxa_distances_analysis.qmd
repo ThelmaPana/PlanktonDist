@@ -49,10 +49,17 @@ df_intra %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+Have a look at Euchaeta.
+
 ```{r}
-df_intra %>% 
+df <- df_intra_dist %>% 
+  filter(taxon == "Mollusca") %>% 
+  drop_na() %>% 
+  pivot_longer(dist:dist_rand)
+df %>% 
   ggplot() +
-  geom_col(aes(x = taxon, y = p_value, fill = n_img)) +
-  scale_fill_viridis_c(trans = "log10") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  geom_density(aes(x = value, colour = name))
+df %>% 
+  ggplot() +
+  stat_ecdf(aes(x = value, colour = name))
 ```
