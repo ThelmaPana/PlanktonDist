@@ -32,7 +32,7 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 
 ## Loop over taxa ----
 #--------------------------------------------------------------------------#
-
+start_time = Sys.time()
 res <- mclapply(taxa, function(my_taxon){
   
   ## Taxon set-up, number of objects per image
@@ -121,7 +121,8 @@ res <- mclapply(taxa, function(my_taxon){
 
 # Combine into a tibble
 df_intra <- do.call(bind_rows, res)
-
+end_time = Sys.time()
+end_time - start_time
 
 ## Reformat results ----
 #--------------------------------------------------------------------------#
@@ -140,8 +141,12 @@ df_intra <- df_intra %>% select(-c(dist, dist_rand))
 ## Save results ----
 #--------------------------------------------------------------------------#
 
-save(df_intra, df_intra_dist, file = "data/03.intra_distances.Rdata")
-
+if (sub_sample){ # if subsample, save .Rdata
+  save(df_intra, df_intra_dist, file = "data/04.intra_distances.Rdata")
+} else { # if all images, use .parquet
+  write_parquet(df_intra, sink = "data/04.intra_stats.parquet")
+  write_parquet(df_intra_dist, sink = "data/04.intra_distances.parquet")
+}
 
 
 

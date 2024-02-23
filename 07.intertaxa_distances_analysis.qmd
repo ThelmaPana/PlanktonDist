@@ -22,7 +22,7 @@ Load computed distances.
 
 ```{r load}
 # intertaxa
-load("data/05.inter_distances.Rdata")
+load("data/06.inter_distances.Rdata")
 
 # Overall
 load("data/02.all_distances.Rdata")

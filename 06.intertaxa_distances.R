@@ -33,14 +33,15 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 # list pairs of taxa
 pairs <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 != t2)
 pairs <- pairs %>% slice_head(n = 100)
+#pairs <- pairs %>% slice_sample(n = 100)
 
 
 ## Loop over pairs ----
 #--------------------------------------------------------------------------#
 
-j = 3
-j = 85
-
+#j = 3
+#j = 85
+start_time = Sys.time()
 # Use indices instead of taxa
 res <- mclapply(1:nrow(pairs), function(j){
   
@@ -73,9 +74,6 @@ res <- mclapply(1:nrow(pairs), function(j){
     # The number of images to generate is now limited by the number of images with both given taxon
     t_n_img <- min(n_img, nrow(img_both))
     
-   #n_pts <- t_img_names %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
-    
-    
     ## Generate random data for given taxon
     # Pick random points within image volumes
     rand_points <- mclapply(1:t_n_img, function(i) {
@@ -92,7 +90,10 @@ res <- mclapply(1:nrow(pairs), function(j){
         z = runif(n = n_tot, min = 1, max = vol$z)
       ) %>% 
         # Simulate taxa with representative proportions
-        mutate(taxon = c(rep(t1, times = n1), rep(t2, times = n2))) %>% 
+        mutate(taxon = c(rep(t1, times = n1), rep(t2, times = n2))) %>%
+        # Shuffle taxon for randomness
+        transform(taxon = sample(taxon)) %>% 
+        as_tibble() %>% 
         # Add information for img name
         mutate(img_name = paste0("img_", str_pad(i, nchar(t_n_img), pad = "0")))
     }, mc.cores = n_cores)
@@ -145,6 +146,8 @@ res <- mclapply(1:nrow(pairs), function(j){
 # Combine into a tibble
 df_inter <- do.call(bind_rows, res)
   
+end_time = Sys.time()
+end_time - start_time
 
 
 ## Reformat results ----
@@ -164,8 +167,13 @@ df_inter <- df_inter %>% select(-c(dist, dist_rand))
 ## Save results ----
 #--------------------------------------------------------------------------#
 
-save(df_inter, df_inter_dist, file = "data/05.inter_distances.Rdata")
 
+if (sub_sample){ # if subsample, save .Rdata
+  save(df_inter, df_inter_dist, file = "data/06.inter_distances.Rdata")
+} else { # if all images, use .parquet
+  write_parquet(df_inter, sink = "data/06.inter_stats.parquet")
+  write_parquet(df_inter_dist, sink = "data/06.inter_distances.parquet")
+}
 
 
 
