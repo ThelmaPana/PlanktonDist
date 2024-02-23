@@ -219,16 +219,22 @@ sol_col <- sol_col %>%
   filter(transect_new == str_remove_all(transect, "0")) %>%  # make sure that transects are ok
   select(transect, img_name:taxon, group) %>% 
   mutate(ratio = height/width)
+
+ggplot(sol_col) + geom_histogram(aes(x = ratio))
 ```
 
-```{r}
+Most solitary collodaria are compressed in width.
+
+```{r height_vs_width}
 sol_col %>% 
   ggplot() +
   geom_point(aes(x = width, y = height, colour = group)) +
   geom_abline(slope = 1, intercept = 0)
 ```
 
-```{r}
+The ratio between height and width is quite coherent for well segmented organisms (group `solitaryblack`), which is not the case for poorly segmented organisms (group `t001`).
+
+```{r ratio_transects}
 #| fig-column: screen-inset
 #| out-width: 100%
 #| fig-width: 10
@@ -244,15 +250,9 @@ sol_col %>%
   facet_wrap(~transect, scales = "free")
 ```
 
-```{r}
-sol_col %>% 
-  filter(group == "solitaryblack") %>% 
-  ggplot() +
-  geom_boxplot(aes(x = 0, y = ratio)) +
-  facet_wrap(~transect, nrow = 2)
-```
+When looking at ratios by transects, we notice both inter and intra transect variations.
 
-```{r}
+```{r ratio_dt}
 #| fig-column: screen-inset
 #| out-width: 100%
 #| fig-width: 10
@@ -268,60 +268,165 @@ sol_col %>%
   facet_wrap(~transect, scales = "free_x", nrow = 4)
 ```
 
+Same when we only look and time and ignore depth.
+
 ## Apply to null data
 
 Compare error in `z` to error in `x`.
 
-```{r}
+::: {.callout-important icon="false"}
+All these tests are performed on one image only.
+:::
 
+Pick one image, apply various correction factors to `x` values, compute distances for all correction factors, assess how distances are wrong compared to the uncorrected image.
 
-toto <- rand_points %>% filter(img_name == "img_00001")
+```{r apply}
+# Use only one image
+rand_points <- rand_points %>%  filter(img_name == "img_00001")
 
-corr_factor <- mean(sol_col$ratio) # just start with the mean
+# Get all correction factors from solitary collodaria
+corr_factors <- sol_col %>% filter(group == "solitaryblack") %>% pull(ratio)
 
-
-x <- toto$x
-y <- sol_col$ratio
-apply_corr <- function(x, y){
-  y_sum <- summary(y)
-  res <- x %*% t(unname(y_sum)) %>% 
-    as.data.frame() %>% 
-    set_names(c("min", "q1", "med", "mean", "q3", "max"))
+# Compute distances for each correction factor
+dist_all <- lapply(corr_factors, function(corr){
+  df <- rand_points %>% mutate(x = x * corr)
   
-  
+  res <- compute_all_dist(df) %>% mutate(corr = corr)    
   return(res)
-}
+})
+dist_all <- do.call(bind_rows, dist_all)
 
-as.data.frame(res) %>% 
-  set_names(c("min", "q1", "med", "mean", "q3", "max"))
+# Join with uncorrected distance and compute error
+dist_all <- dist_all %>% 
+  left_join(dist_all_rand  %>% rename(truth = dist), by = join_by(p1, p2, img_name)) %>% 
+  mutate(error = (dist - truth)/truth)
 
-
-
-titi <- toto %>% 
-  mutate(cors = apply_corr(x, sol_col$ratio)) %>% 
-  unnest_wider(cors)
-
-
-toto$x
-foo <- apply_corr(toto$x, sol_col$ratio)
-
-# Apply correction
-titi <- toto %>% mutate(x = x * corr_factor)
-
-toto %>% 
-  left_join(titi %>% rename(x_corr = x), by = join_by(y, z, img_name)) %>% 
-  pivot_longer(c(x,x_corr)) %>% 
-  ggplot() +
-  geom_point(aes(x = value, y = y, color = name)) +
-  coord_fixed()
-
-
-dist_all <- compute_all_dist(toto)
-dist_all_corr <- compute_all_dist(titi)
-
-dist_all %>% 
-  left_join(dist_all_corr %>% rename(dist_corr = dist), by = join_by(p1, p2, img_name)) %>% 
-  ggplot() + 
-  geom_point(aes(x = dist, y = dist_corr)) + 
-  geom_abline(slope = 1, intercept = 0, colour = "red")
 ```
+
+### Correlation
+
+How do corrected distances correlate with uncorrected distances?
+
+#### Global correlation (all correction factors)
+
+```{r global_corr}
+dist_all %>%
+  ggplot(aes(x = truth, y = dist)) +
+    stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) + 
+  scale_fill_gradient2(low = "white", high = "#4292c6") +
+  geom_abline(slope = 1, intercept = 0) +
+  scale_x_continuous(expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
+  labs(x = "Uncorrected distance", y = "Corrected distance")
+
+cor(dist_all$truth, dist_all$dist, method = "pearson") 
+```
+
+#### Per factor correlation
+
+```{r fact_corr}
+dist_all %>% 
+  group_by(corr) %>% 
+  summarise(correl = cor(truth, dist)) %>% 
+  ungroup() %>% 
+  ggplot() +
+  geom_point(aes(x = corr, y = correl), alpha = 0.1, size = 0.8) +
+  labs(x = "Correction factor", y = "Correlation with uncorrected distances")
+```
+
+::: {.callout-note icon="false"}
+Correlations are good.
+:::
+
+### Relative error
+
+#### Global error (all correction factors)
+
+```{r glob_error}
+ggplot(dist_all) + 
+  geom_histogram(aes(x = error)) +
+  scale_x_continuous(labels = label_percent(), expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = "Relative error")
+summary(dist_all$error)
+```
+
+#### Per factor error
+
+```{r fact_error}
+#dist_all  %>% 
+#  ggplot(aes(x = corr, y = error)) + 
+#  #geom_point(alpha = 0.01, size = 0.01) +
+#  geom_density_2d(aes(x = corr, y = error, color = ..level..)) +
+#  #geom_density_2d_filled(alpha = 0.8) +
+#  scale_colour_distiller(palette = "Blues", direction = 1) +
+#  scale_x_continuous(expand = c(0,0)) +
+#  scale_y_continuous(labels = label_percent(), expand = c(0,0)) +
+#  labs(x = "Correction factor", y = "Relative error")
+
+
+d1 <- ggplot(dist_all) + 
+  geom_histogram(aes(x = corr), fill = "white", color = "black") +
+  theme_void() +
+  scale_x_continuous(expand = c(0,0))
+
+d2 <- ggplot(dist_all) + 
+  geom_histogram(aes(x = error), fill = "white", color = "black") +
+  theme_void() +
+  scale_x_continuous(expand = c(0,0)) +
+  coord_flip()
+
+po <- dist_all  %>% 
+  ggplot(aes(x = corr, y = error)) + 
+  stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) + 
+  scale_fill_gradient2(low = "white", high = "#4292c6") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(labels = label_percent(), expand = c(0,0)) +
+  labs(x = "Correction factor", y = "Relative error")
+
+d1 + plot_spacer() + po + d2 + 
+  plot_layout(
+    ncol = 2, 
+    nrow = 2, 
+    widths = c(4, 1),
+    heights = c(1, 4),
+    byrow = TRUE
+  )
+
+```
+
+The larger the correction factor, the larger the error.
+
+::: {.callout-note icon="false"}
+The median relative error is `r percent(round(median(dist_all$error), digits = 2))`.
+:::
+
+How does this error relate to the error caused by flattening the `z` axis?
+
+```{r z_error}
+dist_all_2d <- compute_all_dist(rand_points, z_dim = FALSE)
+dist_all_3d <- compute_all_dist(rand_points, z_dim = TRUE)
+
+
+df_z <- dist_all_2d %>% 
+  select(img_name, dist_2D = dist) %>% 
+  bind_cols(dist_all_3d %>% select(dist_3D = dist)) %>% 
+  mutate(error = (dist_3D - dist_2D)/dist_2D)
+
+
+ggplot(df_z) + geom_histogram(aes(x = error), binwidth = 1)
+ggplot(df_z) + geom_histogram(aes(x = error), binwidth = 0.02) + xlim(0, 1.1)
+summary(df_z$error)
+
+```
+
+::: {.callout-note icon="false"}
+The median relative error caused by the `z` axis is `r percent(round(median(df_z$error), digits = 2))`, although it can be very high in rare cases.
+:::
