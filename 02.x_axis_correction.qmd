@@ -220,7 +220,7 @@ sol_col <- sol_col %>%
   select(transect, img_name:taxon, group) %>% 
   mutate(ratio = height/width)
 
-ggplot(sol_col) + geom_histogram(aes(x = ratio))
+ggplot(sol_col) + geom_density(aes(x = ratio, colour = group))
 ```
 
 Most solitary collodaria are compressed in width.
@@ -408,7 +408,11 @@ The larger the correction factor, the larger the error.
 The median relative error is `r percent(round(median(dist_all$error), digits = 2))`.
 :::
 
+## Compare to `z` axis error
+
 How does this error relate to the error caused by flattening the `z` axis?
+
+Have a look at the distribution error in `z` for the same image.
 
 ```{r z_error}
 dist_all_2d <- compute_all_dist(rand_points, z_dim = FALSE)
@@ -421,11 +425,20 @@ df_z <- dist_all_2d %>%
   mutate(error = (dist_3D - dist_2D)/dist_2D)
 
 
-ggplot(df_z) + geom_histogram(aes(x = error), binwidth = 1)
-ggplot(df_z) + geom_histogram(aes(x = error), binwidth = 0.02) + xlim(0, 1.1)
+ggplot(df_z) + 
+  geom_histogram(aes(x = error), binwidth = 1) + 
+  labs(x = "Relative error in z") + 
+  scale_x_continuous(labels = label_percent(), expand = c(0,0))
+
+ggplot(df_z) + 
+  geom_histogram(aes(x = error), binwidth = 0.02) + 
+  labs(x = "Relative error in z") + 
+  scale_x_continuous(labels = label_percent(), expand = c(0,0), limits = c(0, 1.1))
 summary(df_z$error)
 
 ```
+
+A few points have very strong `z` axis error (far away in 3D but very close in 2D), but most errors are \< 100%.
 
 ::: {.callout-note icon="false"}
 The median relative error caused by the `z` axis is `r percent(round(median(df_z$error), digits = 2))`, although it can be very high in rare cases.
