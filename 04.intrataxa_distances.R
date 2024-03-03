@@ -33,7 +33,9 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 ## Loop over taxa ----
 #--------------------------------------------------------------------------#
 start_time = Sys.time()
-res <- mclapply(taxa, function(my_taxon){
+df_intra <- mclapply(taxa, function(my_taxon){
+#for (my_taxon in taxa){
+  print(my_taxon)
   
   ## Taxon set-up, number of objects per image
   # Keep organisms of given taxa, only in images with > 1 organism
@@ -78,30 +80,28 @@ res <- mclapply(taxa, function(my_taxon){
     
     # Loop over images and compute distances between all points within each image
     dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
-    
+    # Save X-quantiles, depending on the number of observations
+    if (nrow(dist_all_rand) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      probs <- seq(0, 1, length.out = 10000)
+      dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
+    } else { # otherwise, keep all values
+      dist_all_rand <- dist_all_rand$dist
+    }
     
     ## Compute distances between all organisms
     # Loop over images and compute distances between all points within each image
     dist_all <- compute_all_dist(t_plankton, n_cores = n_cores)
-    
-    
-    ## Comparison with null data
-    # Store distances and null distances together
-    if (sub_sample){
-      set.seed(seed)
-      df_dist <- bind_rows(
-        dist_all %>% select(dist) %>% mutate(data = my_taxon) %>% slice_sample(n = n_dist),
-        dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
-      )
-    } else {
-      df_dist <- bind_rows(
-        dist_all %>% select(dist) %>% mutate(data = my_taxon),
-        dist_all_rand %>% select(dist) %>% mutate(data = "null"))
+    # Save X-quantiles, depending on the number of observations
+    if (nrow(dist_all) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      probs <- seq(0, 1, length.out = 10000)
+      dist_all <- quantile(dist_all$dist, probs = probs, names = FALSE)
+    } else { # otherwise, keep all values
+      dist_all <- dist_all$dist
     }
-    
+
     # Kuiper-test
-    s1 <-  df_dist %>% filter(data == my_taxon) %>% pull(dist)
-    s2 <-  df_dist %>% filter(data == "null") %>% pull(dist)
+    s1 <-  dist_all
+    s2 <-  dist_all_rand
     out <-  kuiper_test(s1, s2)
     
     # Return outputs
@@ -111,16 +111,14 @@ res <- mclapply(taxa, function(my_taxon){
       n_img = t_n_img,
       test_stat = out[1],
       p_value = out[2],
-      dist = list(df_dist %>% filter(data != "null") %>% pull(dist)),
-      dist_rand = list(df_dist %>% filter(data == "null") %>% pull(dist)),
+      dist = list(dist_all),
+      dist_rand = list(dist_all_rand),
     )
 
   }  
-}, mc.cores = n_cores)
+}, mc.cores = n_cores) %>% 
+  bind_rows()
 
-
-# Combine into a tibble
-df_intra <- do.call(bind_rows, res)
 end_time = Sys.time()
 end_time - start_time
 
@@ -138,15 +136,21 @@ df_intra_dist <- df_intra %>%
 df_intra <- df_intra %>% select(-c(dist, dist_rand))
 
 
+
+### Plots ----
+##--------------------------------------------------------------------------#
+#df_intra_dist %>% 
+#  filter(taxon == "Doliolida") %>% 
+#  pivot_longer(dist:dist_rand) %>% 
+#  ggplot() + 
+#  stat_ecdf(aes(x = value, colour = name))
+
+
+
 ## Save results ----
 #--------------------------------------------------------------------------#
+save(df_intra, df_intra_dist, file = "data/04.intra_distances.Rdata")
 
-if (sub_sample){ # if subsample, save .Rdata
-  save(df_intra, df_intra_dist, file = "data/04.intra_distances.Rdata")
-} else { # if all images, use .parquet
-  write_parquet(df_intra, sink = "data/04.intra_stats.parquet")
-  write_parquet(df_intra_dist, sink = "data/04.intra_distances.parquet")
-}
 
 
 

@@ -32,7 +32,7 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 
 # list pairs of taxa
 pairs <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 != t2)
-pairs <- pairs %>% slice_head(n = 100)
+#pairs <- pairs %>% slice_head(n = 100)
 #pairs <- pairs %>% slice_sample(n = 100)
 
 
@@ -43,7 +43,7 @@ pairs <- pairs %>% slice_head(n = 100)
 #j = 85
 start_time = Sys.time()
 # Use indices instead of taxa
-res <- mclapply(1:nrow(pairs), function(j){
+df_inter <- mclapply(1:nrow(pairs), function(j){
   
   # Get pair
   my_pair <- pairs %>% slice(j)
@@ -103,30 +103,30 @@ res <- mclapply(1:nrow(pairs), function(j){
     rand_points <- do.call(bind_rows, rand_points)
     
     # Loop over images and compute distances between all points within each image
-    dist_all_rand <- compute_all_dist_inter(rand_points)
+    dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+    # Save X-quantiles, depending on the number of observations
+    if (nrow(dist_all_rand) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      probs <- seq(0, 1, length.out = 10000)
+      dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
+    } else { # otherwise, keep all values
+      dist_all_rand <- dist_all_rand$dist
+    }
     
     ## Compute distances between all organisms
     # Loop over images and compute distances between all points within each image
-    dist_all <- compute_all_dist_inter(t_plankton, n_cores = n_cores)
-    
-    
-    ## Comparison with null data
-    # Store distances and null distances together
-    if (sub_sample){
-      set.seed(seed)
-      df_dist <- bind_rows(
-        dist_all %>% select(dist) %>% mutate(data = my_pair_str) %>% slice_sample(n = n_dist),
-        dist_all_rand %>% select(dist) %>% mutate(data = "null") %>% slice_sample(n = n_dist)
-      )
-    } else {
-      df_dist <- bind_rows(
-        dist_all %>% select(dist) %>% mutate(data = my_taxon),
-        dist_all_rand %>% select(dist) %>% mutate(data = "null"))
+    dist_all <- compute_all_dist(t_plankton, n_cores = n_cores)
+    # Save X-quantiles, depending on the number of observations
+    if (nrow(dist_all) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      probs <- seq(0, 1, length.out = 10000)
+      dist_all <- quantile(dist_all$dist, probs = probs, names = FALSE)
+    } else { # otherwise, keep all values
+      dist_all <- dist_all$dist
     }
     
+    ## Comparison with null data
     # Kuiper-test
-    s1 <-  df_dist %>% filter(data == my_pair_str) %>% pull(dist)
-    s2 <-  df_dist %>% filter(data == "null") %>% pull(dist)
+    s1 <-  dist_all
+    s2 <-  dist_all_rand
     out <-  kuiper_test(s1, s2)
     
     # Return outputs
@@ -136,18 +136,20 @@ res <- mclapply(1:nrow(pairs), function(j){
       n_img = t_n_img,
       test_stat = out[1],
       p_value = out[2],
-      dist = list(df_dist %>% filter(data != "null") %>% pull(dist)),
-      dist_rand = list(df_dist %>% filter(data == "null") %>% pull(dist)),
+      dist = list(dist_all),
+      dist_rand = list(dist_all_rand),
     )
-
   }  
-}, mc.cores = n_cores)
+}, mc.cores = n_cores) %>% 
+  bind_rows()
 
-# Combine into a tibble
-df_inter <- do.call(bind_rows, res)
   
 end_time = Sys.time()
 end_time - start_time
+
+df_inter %>% 
+  ggplot() + 
+  geom_jitter(aes(x = 0, y = p_value, colour = str_detect(pair, "Acant")))
 
 
 ## Reformat results ----
@@ -166,30 +168,9 @@ df_inter <- df_inter %>% select(-c(dist, dist_rand))
 
 ## Save results ----
 #--------------------------------------------------------------------------#
+save(df_inter, df_inter_dist, file = "data/06.inter_distances.Rdata")
 
 
-if (sub_sample){ # if subsample, save .Rdata
-  save(df_inter, df_inter_dist, file = "data/06.inter_distances.Rdata")
-} else { # if all images, use .parquet
-  write_parquet(df_inter, sink = "data/06.inter_stats.parquet")
-  write_parquet(df_inter_dist, sink = "data/06.inter_distances.parquet")
-}
-
-
-
-
-#df_inter
-#
-#df_inter
-#my_pair_str
-#
-#df_inter_dist %>% 
-#  filter(pair == my_pair_str) %>% 
-#  pivot_longer(c(dist, dist_rand), values_to = "dist") %>% 
-#  mutate(data = ifelse(name == "dist_rand", "null", pair)) %>% 
-#  select(data, dist) %>% 
-#  ggplot(aes(x = dist, colour = data)) +
-#  stat_ecdf()
 
 ### ----quadrats--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## 1 image = 5 square frames
