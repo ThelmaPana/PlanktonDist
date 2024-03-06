@@ -19,6 +19,8 @@ execute:
 #| cache: false
 source("utils.R")
 load("data/01.null_data.Rdata")
+
+read_from_ecotaxa <- FALSE # whether to read solitary collodaria from Ecotaxa
 ```
 
 ```{python py_set_up}
@@ -193,32 +195,39 @@ if run:
 ## Read from Ecotaxa
 
 ```{r read_eco}
-# Fields to extract
-fields <- "obj.orig_id,sam.orig_id,txo.display_name,obj.classif_qual"
-
-# Extract object from project
-o <- get_object_set(project_id = 11779, ProjectFilters = ProjectFilters(), fields = fields)
-
-# Get details
-sol_col <- o$details %>% 
-  as_tibble(.name_repair = "minimal") %>% 
-  setNames(str_split(fields, ",")[[1]]) %>% 
-  # rename columns
-  rename(
-    object_id = obj.orig_id,
-    transect_new = sam.orig_id, # missed "0" in front of transect number, keep it for sanity check
-    group = txo.display_name,
-    classif_qual = obj.classif_qual
-  ) %>% 
-  # keep only validated objects
-  filter(classif_qual == "V")
-
-# Join with plankton table
-sol_col <- sol_col %>% 
-  left_join(plankton, by = join_by(object_id)) %>% 
-  filter(transect_new == str_remove_all(transect, "0")) %>%  # make sure that transects are ok
-  select(transect, img_name:taxon, group) %>% 
-  mutate(ratio = height/width)
+if (read_from_ecotaxa){
+  # Fields to extract
+  fields <- "obj.orig_id,sam.orig_id,txo.display_name,obj.classif_qual"
+  
+  # Extract object from project
+  o <- get_object_set(project_id = 11779, ProjectFilters = ProjectFilters(), fields = fields)
+  
+  # Get details
+  sol_col <- o$details %>% 
+    as_tibble(.name_repair = "minimal") %>% 
+    setNames(str_split(fields, ",")[[1]]) %>% 
+    # rename columns
+    rename(
+      object_id = obj.orig_id,
+      transect_new = sam.orig_id, # missed "0" in front of transect number, keep it for sanity check
+      group = txo.display_name,
+      classif_qual = obj.classif_qual
+    ) %>% 
+    # keep only validated objects
+    filter(classif_qual == "V")
+  
+  # Join with plankton table
+  sol_col <- sol_col %>% 
+    left_join(plankton, by = join_by(object_id)) %>% 
+    filter(transect_new == str_remove_all(transect, "0")) %>%  # make sure that transects are ok
+    select(transect, img_name:taxon, group) %>% 
+    mutate(ratio = height/width)
+  
+  # Save it
+  save(sol_col, file = "data/02.sol_col.Rdata")
+} else {
+  load("data/02.sol_col.Rdata")
+}
 
 ggplot(sol_col) + geom_density(aes(x = ratio, colour = group))
 ```
@@ -357,17 +366,6 @@ summary(dist_all$error)
 #### Per factor error
 
 ```{r fact_error}
-#dist_all  %>% 
-#  ggplot(aes(x = corr, y = error)) + 
-#  #geom_point(alpha = 0.01, size = 0.01) +
-#  geom_density_2d(aes(x = corr, y = error, color = ..level..)) +
-#  #geom_density_2d_filled(alpha = 0.8) +
-#  scale_colour_distiller(palette = "Blues", direction = 1) +
-#  scale_x_continuous(expand = c(0,0)) +
-#  scale_y_continuous(labels = label_percent(), expand = c(0,0)) +
-#  labs(x = "Correction factor", y = "Relative error")
-
-
 d1 <- ggplot(dist_all) + 
   geom_histogram(aes(x = corr), fill = "white", color = "black") +
   theme_void() +
@@ -443,3 +441,118 @@ A few points have very strong `z` axis error (far away in 3D but very close in 2
 ::: {.callout-note icon="false"}
 The median relative error caused by the `z` axis is `r percent(round(median(df_z$error), digits = 2))`, although it can be very high in rare cases.
 :::
+
+## Single correction factor (the median)
+
+As the distribution of correction factors is very narrow, let’s now focus on one correction factor only: the median of correction factors. Use this correction factor as a reference to compute relative error.
+
+```{r to_med_err}
+# Use the median of ratios as correction factor
+med_corr <- median(sol_col$ratio)
+
+# new truth
+med_truth <- dist_all %>% 
+  filter(corr == med_corr) %>% 
+  select(p1, p2, truth = dist, img_name)
+
+# other correction factors
+med_dist <- dist_all %>% 
+  select(p1, p2, dist, img_name, corr)
+
+# Join new truth and other distances
+med_dist <- med_dist %>% 
+  left_join(med_truth, by = join_by(p1, p2, img_name)) %>% 
+  mutate(error = (dist - truth)/truth)
+```
+
+### Correlation
+
+How do corrected distances correlate with uncorrected distances?
+
+#### Global correlation (all correction factors)
+
+```{r global_corr_med}
+med_dist %>%
+  ggplot(aes(x = truth, y = dist)) +
+    stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) + 
+  scale_fill_gradient2(low = "white", high = "#4292c6") +
+  geom_abline(slope = 1, intercept = 0) +
+  scale_x_continuous(expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
+  labs(x = "Uncorrected distance", y = "Corrected distance")
+
+cor(med_dist$truth, med_dist$dist, method = "pearson") 
+```
+
+#### Per factor correlation
+
+```{r fact_corr_med}
+med_dist %>% 
+  group_by(corr) %>% 
+  summarise(correl = cor(truth, dist)) %>% 
+  ungroup() %>% 
+  ggplot() +
+  geom_point(aes(x = corr, y = correl), alpha = 0.1, size = 0.8) +
+  geom_vline(xintercept = med_corr, color = "red") + 
+  labs(x = "Correction factor", y = "Correlation with uncorrected distances")
+```
+
+Correlations are good.
+
+### Relative error
+
+#### Global error (all correction factors)
+
+```{r glob_error_med}
+ggplot(med_dist) + 
+  geom_histogram(aes(x = error)) +
+  scale_x_continuous(labels = label_percent(), expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = "Relative error")
+summary(med_dist$error)
+summary(abs(med_dist$error))
+```
+
+#### Per factor error
+
+```{r fact_error_med}
+d1 <- ggplot(med_dist) + 
+  geom_histogram(aes(x = corr), fill = "white", color = "black") +
+  theme_void() +
+  scale_x_continuous(expand = c(0,0))
+
+d2 <- ggplot(med_dist) + 
+  geom_histogram(aes(x = error), fill = "white", color = "black") +
+  theme_void() +
+  scale_x_continuous(expand = c(0,0)) +
+  coord_flip()
+
+po <- med_dist  %>% 
+  ggplot(aes(x = corr, y = error)) + 
+  stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) + 
+  scale_fill_gradient2(low = "white", high = "#4292c6") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(labels = label_percent(), expand = c(0,0)) +
+  labs(x = "Correction factor", y = "Relative error")
+
+d1 + plot_spacer() + po + d2 + 
+  plot_layout(
+    ncol = 2, 
+    nrow = 2, 
+    widths = c(4, 1),
+    heights = c(1, 4),
+    byrow = TRUE
+  )
+
+```
+
+The larger the correction factor, the larger the error.
+
+The median relative absolute error is `r percent(round(median(abs(med_dist$error)), digits = 2))`, which is very small compared to the error caused by the lack of information in the `z` axis.

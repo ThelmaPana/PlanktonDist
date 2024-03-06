@@ -43,8 +43,8 @@ df_intra %>%
 ```{r}
 df_intra %>% 
   ggplot() +
-  geom_col(aes(x = taxon, y = test_stat, fill = n_obj)) +
-  geom_hline(yintercept = df_all$test_stat, colour = "red") +
+  geom_col(aes(x = taxon, y = p_value, fill = n_obj)) +
+  #geom_hline(yintercept = df_all$test_stat, colour = "red") +
   scale_fill_viridis_c(trans = "log10") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
