@@ -537,6 +537,7 @@ po <- med_dist  %>%
     aes(fill = after_stat(density)),
     contour = FALSE
   ) + 
+  geom_vline(xintercept = med_corr, color = "red") + 
   scale_fill_gradient2(low = "white", high = "#4292c6") +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(labels = label_percent(), expand = c(0,0)) +
@@ -556,3 +557,32 @@ d1 + plot_spacer() + po + d2 +
 The larger the correction factor, the larger the error.
 
 The median relative absolute error is `r percent(round(median(abs(med_dist$error)), digits = 2))`, which is very small compared to the error caused by the lack of information in the `z` axis.
+
+## Apply the single correction factor to data
+
+Let’s apply the correction factor to ISIIS and null data, i.e. multiply `x` axis values by `r med_corr`. We also recompute distances between null data points.
+
+```{r apply_corr}
+#| cache.lazy: false
+# Load null data
+load("data/01.null_data.Rdata")
+rm(dist_all_rand)
+# Load plankton
+plankton <- read_parquet("data/00.plankton_clean.parquet")
+
+# Apply correction factor to null and plankton data
+# For plankton, we also apply the correction factor to width
+rand_points <- rand_points %>% mutate(x = x * med_corr)
+plankton <- plankton %>% 
+  mutate(
+    x = x * med_corr,
+    width = width * med_corr
+  )
+
+# Compute distances in null data
+dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+
+# Save it
+save(dist_all_rand, rand_points, file = "data/02.x_corrected_null_data.Rdata")
+write_parquet(plankton, sink = "data/02.x_corrected_plankton_clean.parquet")
+```
