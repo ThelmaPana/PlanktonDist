@@ -81,4 +81,5 @@ images_sub <- images %>% slice_sample(n = n_img)
 plankton_sub <- plankton %>% filter(img_name %in% images_sub$img_name)
 
 # Save
-save(plankton_sub, images_sub, file = "data/00.subsample.Rdata")
+save(plankton_sub, file = "data/00.plankton_sub.Rdata")
+save(images_sub, file = "data/00.images_sub.Rdata")

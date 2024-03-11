@@ -19,104 +19,30 @@ execute:
 source("utils.R")
 ```
 
-::: {.callout-warning icon="false"}
-Work with a subsample of the data: `r format(n_img, big.mark = ",")` images.
-:::
+Load computed distances
 
 ```{r read}
 #| cache.lazy: false
-
-## Subsampling
-if (sub_sample){
-  load("data/00.subsample.Rdata")
-  images <- images_sub
-  plankton <- plankton_sub
-} else {
-  ## All data
-  images <- read_parquet("data/00.images_clean.parquet")
-  plankton <- read_parquet("data/00.plankton_clean.parquet")
-}
-
-# list img names
-img_names <- sort(unique(images$img_name))
-
-## Null hypothesis data
-load(here("data/01.null_data.Rdata"))
+load("data/03.all_distances.Rdata")
 ```
 
-Define window size for point pattern analysis.
+Plot ECDF.
 
-```{r vol_size}
-# image volume in pixels
-vol <- c()
-vol$x <- 10240
-vol$y <- 2048
-vol$z <- 9572
+```{r ecdf}
+df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
+  mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
+  ggplot() + 
+  stat_ecdf(aes(x = dist, colour = type))
 ```
 
-## Distances between all organisms
+Here is the result of the kuiper test.
 
-To investigate overall randomness, let’s compute distances between all pairs of organisms within an image.
-
-```{r all_dist}
-#| warning: false
-# Loop over images and compute distances between all points within each image
-dist_all <- compute_all_dist(plankton, n_cores = n_cores)
-
-# Plot all
-#ggplot(dist_all) + 
-#  geom_density(aes(x = dist, group = img_name), alpha = 0.1, linewidth = 0.02, colour = "dodgerblue") +
-#  geom_density(aes(x = dist))
-
-ggplot(dist_all) + 
-  geom_density(aes(x = dist))
-```
-
-## Compare with null data using Kuiper test
-
-Plot ECDF for null distances and all data. Use 10000-percentiles for computations.
-
-```{r plot_ecdf}
-# Extract quantiles
-probs <- seq(0, 1, length.out = 10000)
-dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
-dist_all <- quantile(dist_all$dist, probs = probs, names = FALSE)
-
-tibble(dist = dist_all, data = "all") %>% 
-  bind_rows(tibble(dist = dist_all_rand, data = "null")) %>%   
-  ggplot(aes(dist, colour = data)) +
-  stat_ecdf(geom = "step")
-```
-
-This looks very similar…
-
-Perform Kuiper test on a subsample
-
-```{r compare}
-out <-  kuiper_test(dist_all, dist_all_rand)
-out
-summary(out)
-plot(out)
-```
-
-… and indeed it is similar!
-
-Save the results
-
-```{r save}
-# Store results
-df_all <- tibble(
-  taxon = "all",
-  n_obj = nrow(plankton),
-  n_img = nrow(images),
-  test_stat = out[1],
-  p_value = out[2],
-  dist = list(dist_all),
-  dist_rand = list(dist_all_rand),
-)
-
-# Save
-save(df_all, file = "data/03.all_distances.Rdata")
+```{r kuiper}
+df_all$test_stat
+df_all$p_value
 ```
 
 ::: {.callout-note icon="false"}

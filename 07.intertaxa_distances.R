@@ -14,13 +14,14 @@ source("utils.R")
 
 ## Subsampling
 if (sub_sample){
-  load("data/00.subsample.Rdata")
+  load("data/00.images_sub.Rdata")
+  load("data/02.x_corrected_plankton_sub.Rdata")
   images <- images_sub
   plankton <- plankton_sub
 } else {
   ## All data
   images <- read_parquet("data/00.images_clean.parquet")
-  plankton <- read_parquet("data/00.plankton_clean.parquet")
+  plankton <- read_parquet("data/02.x_corrected_plankton_clean.parquet")
 }
 
 # list img names
@@ -32,7 +33,7 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 
 # list pairs of taxa
 pairs <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 != t2)
-#pairs <- pairs %>% slice_head(n = 100)
+pairs <- pairs %>% slice_head(n = 10)
 #pairs <- pairs %>% slice_sample(n = 100)
 
 
@@ -168,44 +169,4 @@ df_inter <- df_inter %>% select(-c(dist, dist_rand))
 
 ## Save results ----
 #--------------------------------------------------------------------------#
-save(df_inter, df_inter_dist, file = "data/06.inter_distances.Rdata")
-
-
-
-### ----quadrats--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-## 1 image = 5 square frames
-## we can do 10 quadrats in x and 2 in y: square quadraits, 20 per image
-#nx <- 10 # quadrats in x dimension
-#ny <- 2  # quadrats in y dimension
-#
-## p-value threshold for randomness
-#thres <- 0.01
-#
-## Loop over images and perform the quadrat test in each one
-#qt_all <- mclapply(img_names, function(name) {
-#  # Get points within image
-#  points <- t_plankton %>% 
-#    filter(img_name == name) %>% 
-#    select(x, y)
-#  
-#  # Convert to ppp
-#  points_ppp <- ppp(points$x, points$y, window = owin(xrange = c(1, vol$x), yrange = c(1, vol$y)))
-#  
-#  # Perform quadrat test and extract p-value
-#  qt <- quadrat.test(points_ppp, nx = nx, ny = ny, method = "MonteCarlo", conditional = TRUE)
-#  
-#  # Store results in a tibble and return it
-#  tibble(img_name = name, n_obj = nrow(points), p_value = qt$p.value)
-#}, mc.cores = n_cores)
-#
-## Transform list to one tibble
-#df_qt <- do.call(bind_rows, qt_all) %>% 
-#  # distribution is random if p_value > thres
-#  mutate(random = ifelse(p_value < thres, FALSE, TRUE))
-#summary(df_qt)
-#
-#
-### ----plot_p_val------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#ggplot(df_qt) + geom_histogram(aes(x = p_value), bins = 100)
-#ggplot(df_qt) + geom_density_2d(aes(x = n_obj, y = p_value))
-
+save(df_inter, df_inter_dist, file = "data/07.inter_distances.Rdata")

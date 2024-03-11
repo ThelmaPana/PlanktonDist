@@ -22,11 +22,10 @@ Load computed distances.
 
 ```{r load}
 # Intrataxa
-load("data/04.intra_distances.Rdata")
+load("data/05.intra_distances.Rdata")
 
 # Overall
-load("data/02.all_distances.Rdata")
-
+load("data/03.all_distances.Rdata")
 ```
 
 Plot test stat
@@ -42,6 +41,12 @@ df_intra %>%
 
 ```{r}
 df_intra %>% 
+  ggplot() + 
+  geom_point(aes(x = n_img, y = test_stat))
+```
+
+```{r}
+df_intra %>% 
   ggplot() +
   geom_col(aes(x = taxon, y = p_value, fill = n_obj)) +
   #geom_hline(yintercept = df_all$test_stat, colour = "red") +
@@ -49,13 +54,14 @@ df_intra %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Have a look at Euchaeta.
+Have a look at one group.
 
 ```{r}
 df <- df_intra_dist %>% 
   filter(taxon == "Mollusca") %>% 
   drop_na() %>% 
   pivot_longer(dist:dist_rand)
+df_intra %>% filter(taxon == "Mollusca")
 df %>% 
   ggplot() +
   geom_density(aes(x = value, colour = name))

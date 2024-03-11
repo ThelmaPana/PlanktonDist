@@ -24,7 +24,8 @@ source("utils.R")
 
 ## Subsampling
 if (sub_sample){
-  load("data/00.subsample.Rdata")
+  load("data/00.images_sub.Rdata")
+  load("data/00.plankton_sub.Rdata")
   images <- images_sub
   plankton <- plankton_sub
 } else {
@@ -144,31 +145,27 @@ dist_2 <- compute_all_dist(set_2, n_cores = n_cores)
 ```
 
 ```{r two_sets_plot}
-foo <- bind_rows(
+sets <- bind_rows(
   dist_1 %>% mutate(set = "1"),
   dist_2 %>% mutate(set = "2")
 ) 
 
-foo %>% 
+sets %>% 
   ggplot() +
   geom_density(aes(x = dist, colour = set)) +
   labs(title = "Density distribution of distances for two random distributions")
 ```
 
 ```{r two_set_comp}
-bar <- bind_rows(
-  dist_1 %>% mutate(set = "1") %>% slice_sample(n = 10000),
-  dist_2 %>% mutate(set = "2") %>% slice_sample(n = 10000)
-) 
+# Extract 10000-quantiles to perform comparison
+probs <- seq(0, 1, length.out = 10000)
+dist_1 <- quantile(dist_1$dist, probs = probs, names = FALSE)
+dist_2 <- quantile(dist_2$dist, probs = probs, names = FALSE)
 
-bar %>% 
-  ggplot() +
-  stat_ecdf(aes(x = dist, colour = set)) +
-  labs(title = "ECDF of distances for two random distributions")
+tibble(dist = dist_1, set = "1") %>% 
+  bind_rows(tibble(dist = dist_2, set = "2")) %>%   
+  ggplot(aes(dist, colour = set)) +
+  stat_ecdf(geom = "step")
 
-
-s1 <- bar %>% filter(set == "1") %>% pull(dist)
-s2 <- bar %>% filter(set == "2") %>% pull(dist)
-
-kuiper_test(s1, s2)
+kuiper_test(dist_1, dist_2)
 ```
