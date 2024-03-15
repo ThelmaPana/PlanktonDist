@@ -1,14 +1,8 @@
+#/usr/bin/R
 #--------------------------------------------------------------------------#
 # Project: PlanktonDist
 # Script purpose: Compute all distances between objects
 # Date: 11/03/2024
-# Author: Thelma Panaïotis
-#--------------------------------------------------------------------------#
-
-#--------------------------------------------------------------------------#
-# Project: PlanktonDist
-# Script purpose: Compute intrataxa distances for all taxa
-# Date: 12/02/2024
 # Author: Thelma Panaïotis
 #--------------------------------------------------------------------------#
 
@@ -18,6 +12,9 @@
 source("utils.R")
 
 
+message("Reading data")
+
+sub_sample <- F
 ## Subsampling
 if (sub_sample){
   load("data/00.images_sub.Rdata")
@@ -34,16 +31,62 @@ if (sub_sample){
 load("data/02.x_corrected_null_data.Rdata")
 
 
+#images <- images %>% slice_sample(n = 10000)
+#plankton <- plankton %>% filter(img_name %in% images$img_name)
+#
+
+
+## Break into chunks ----
+#--------------------------------------------------------------------------#
+message("Generating chunks")
+
+# Break into n pieces of images to process 
+n_chunk <- 6 # number of chunks
+chunk_size <- ceiling(nrow(images) / 7) # size of chunks
+# compute chunks
+images <- images %>% 
+  mutate(
+    chunk = as.character(floor((row_number() - 1) / chunk_size) + 1),
+    .before = transect
+  )
+# propagate chunks to plankton
+plankton <- plankton %>% left_join(images %>% select(img_name, chunk), by = join_by(img_name))
+
+# split by chunk
+plankton <- plankton %>% 
+  group_by(chunk) %>% 
+  group_split()
+
+gc(verbose = FALSE)
+
 
 ## Distances between all organisms ----
 #--------------------------------------------------------------------------#
 # Loop over images and compute distances between all points within each image
-dist_all <- compute_all_dist(plankton, n_cores = n_cores)
 
+message("Computing distances")
+
+dist_all <- lapply(1:n_chunk, function(i) {
+  message(paste("Processing chunk", i, "out of", n_chunk))
+  
+  # Get chunk data
+  df <- plankton[[i]]
+  # Compute distances
+  dist_all <- compute_all_dist(df, n_cores = n_cores)
+  # Sleep
+  Sys.sleep(30)
+  # Return results
+  return(dist_all)
+}) %>% 
+  bind_rows()
+
+message("Done with computing distances")
 
 
 ## Compare to null data ----
 #--------------------------------------------------------------------------#
+message("Comparing to null data")
+
 # First, we extract 10000-quantiles
 probs <- seq(0, 1, length.out = 10000)
 dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
@@ -56,6 +99,7 @@ out
 
 ## Save results ----
 #--------------------------------------------------------------------------#
+message("Saving")
 # Store results
 df_all <- tibble(
   taxon = "all",

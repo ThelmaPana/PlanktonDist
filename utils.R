@@ -4,12 +4,13 @@ library(tidyverse)
 library(here)
 library(reshape2)
 library(parallel)
+library(pbmcapply)
 library(hms)
 library(ecotaxarapi)
 
 
 # Null hypothesis
-library(MASS)
+#library(MASS)
 library(twosamples)
 
 # Reading data
@@ -51,7 +52,7 @@ data_dir <- here("data")
 
 ## Parallel ----
 #--------------------------------------------------------------------------#
-n_cores <- 12
+n_cores <- 4
 
 ## Seed ----
 #--------------------------------------------------------------------------#
@@ -90,19 +91,19 @@ increment_files <- function(to_increment){
 #' @return a dataframe with all distances for each image
 #' 
 compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
-  dist_all <- mclapply(unique(points$img_name), function(name) {
+  dist_all <- pbmclapply(unique(points$img_name), function(name) {
     
     # Get points within image, split dataframe by taxon
     if (z_dim){ # 3D case
       points_img <-  points %>% 
         filter(img_name == name) %>% 
-        select(taxon, x, y, z) %>% 
+        dplyr::select(taxon, x, y, z) %>% 
         group_by(taxon) %>% 
         group_split(.keep = F)
     } else { # 2D case
       points_img <- points %>% 
         filter(img_name == name) %>% 
-        select(taxon, x, y) %>% 
+        dplyr::select(taxon, x, y) %>% 
         group_by(taxon) %>% 
         group_split(.keep = F)
     }
@@ -117,7 +118,7 @@ compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
         mutate(img_name = name)
     
     return(dist_all)
-   }, mc.cores = n_cores)
+   }, mc.cores = n_cores, ignore.interactive = TRUE)
   
   # Combine results in a dataframe
   dist_all <- do.call(bind_rows, dist_all)
@@ -143,7 +144,6 @@ compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
 
 
 
-
 #' Compute distances between all points within an ensemble of images
 #' 
 #' In each image, the distance between all unique pairs of points is computed.
@@ -155,18 +155,18 @@ compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
 #' @return a dataframe with all distances for each image
 #' 
 compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
-  dist_all <- mclapply(unique(points$img_name), function(name) {
+  dist_all <- pbmclapply(unique(points$img_name), function(name) {
     
     # Get points within image
     if (z_dim){ # 3D case
       points_img <-  points %>% 
         filter(img_name == name) %>% 
-        select(x, y, z) %>% 
+        dplyr::select(x, y, z) %>% 
         as.matrix()
     } else { # 2D case
       points_img <-  points %>% 
         filter(img_name == name) %>% 
-        select(x, y) %>% 
+        dplyr::select(x, y) %>% 
         as.matrix()
     }
     
@@ -175,15 +175,16 @@ compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
       as_tibble() %>% 
       filter(p1 != p2) %>% 
       rename(dist = value) %>% 
-      mutate(img_name = name)
-  }, mc.cores = n_cores)
-  
-  # Combine results in a dataframe
-  dist_all <- do.call(bind_rows, dist_all)  %>% 
-    # Keep only one of distances compute between A and B (A to B and B to A were computed)
-    mutate(pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))) %>% 
-    distinct(img_name, pair, dist, .keep_all = TRUE) %>% 
-    select(-pair)
+      mutate(
+        img_name = name,
+        # Keep only one of distances compute between A and B (A to B and B to A were computed)
+        pair = ifelse(p1 < p2, paste(p1, p2), paste(p2, p1))
+      ) %>% 
+      distinct(pair, dist, .keep_all = TRUE) %>% 
+      dplyr::select(-pair)
+  }, mc.cores = n_cores, ignore.interactive = TRUE
+  ) %>% 
+    bind_rows()
   
   # Check that we have the number of expected distances within each image
   # For a set of n points, the number of unique distances is n(n-1)/2

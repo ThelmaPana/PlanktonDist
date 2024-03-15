@@ -1,3 +1,4 @@
+#/usr/local/bin/R
 #--------------------------------------------------------------------------#
 # Project: PlanktonDist
 # Script purpose: Compute intrataxa distances for all taxa
