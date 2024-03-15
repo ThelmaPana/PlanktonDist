@@ -13,8 +13,8 @@ source("utils.R")
 
 
 message("Reading data")
+sub_sample <- FALSE
 
-sub_sample <- F
 ## Subsampling
 if (sub_sample){
   load("data/00.images_sub.Rdata")
@@ -29,11 +29,6 @@ if (sub_sample){
 
 ## Null hypothesis data
 load("data/02.x_corrected_null_data.Rdata")
-
-
-#images <- images %>% slice_sample(n = 10000)
-#plankton <- plankton %>% filter(img_name %in% images$img_name)
-#
 
 
 ## Break into chunks ----
