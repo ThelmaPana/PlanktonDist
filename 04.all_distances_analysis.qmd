@@ -26,6 +26,18 @@ Load computed distances
 load("data/03.all_distances.Rdata")
 ```
 
+Plot distribution
+
+```{r dist}
+df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
+  mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
+  ggplot() + 
+  geom_density(aes(x = dist, colour = type))
+```
+
 Plot ECDF.
 
 ```{r ecdf}
