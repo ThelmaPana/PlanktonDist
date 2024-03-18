@@ -13,6 +13,10 @@ message("Reading data")
 
 source("utils.R")
 
+# Correct image volume for x-axis
+load("data/02.corr_factor.Rdata")
+vol$x <- vol$x * med_corr
+
 sub_sample <- F
 ## Subsampling
 if (sub_sample){
