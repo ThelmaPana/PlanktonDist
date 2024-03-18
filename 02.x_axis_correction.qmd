@@ -589,4 +589,5 @@ plankton_sub <- plankton_sub %>%
 # Save it
 write_parquet(plankton, sink = "data/02.x_corrected_plankton_clean.parquet")
 save(plankton_sub, file = "data/02.x_corrected_plankton_sub.Rdata")
+save(med_corr, file = "data/02.corr_factor.Rdata")
 ```

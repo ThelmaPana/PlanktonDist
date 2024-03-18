@@ -12,6 +12,11 @@
 source("utils.R")
 
 
+# Correct image volume for x-axis
+load("data/02.corr_factor.Rdata")
+vol$x <- vol$x * med_corr
+
+
 message("Reading data")
 sub_sample <- FALSE
 
@@ -26,9 +31,6 @@ if (sub_sample){
   images <- read_parquet("data/00.images_clean.parquet")
   plankton <- read_parquet("data/02.x_corrected_plankton_clean.parquet")
 }
-
-## Null hypothesis data
-load("data/02.x_corrected_null_data.Rdata")
 
 
 ## Break into chunks ----
@@ -57,9 +59,9 @@ gc(verbose = FALSE)
 
 ## Distances between all organisms ----
 #--------------------------------------------------------------------------#
-# Loop over images and compute distances between all points within each image
+# Loop over chunks and compute distances between all points within each image
 
-message("Computing distances")
+message("Computing plankton distances")
 
 dist_all <- lapply(1:n_chunk, function(i) {
   message(paste("Processing chunk", i, "out of", n_chunk))
@@ -70,12 +72,58 @@ dist_all <- lapply(1:n_chunk, function(i) {
   dist_all <- compute_all_dist(df, n_cores = n_cores)
   # Sleep
   Sys.sleep(30)
+  
+  
   # Return results
   return(dist_all)
 }) %>% 
   bind_rows()
 
-message("Done with computing distances")
+message("Done with computing plankton distances")
+
+
+## Generate null data and compute distances ----
+#--------------------------------------------------------------------------#
+# Loop over chunks, generate null data and computed distances
+
+message("Computing null distances")
+
+dist_all_rand <- lapply(1:n_chunk, function(i) {
+  message(paste("Processing chunk", i, "out of", n_chunk))
+  
+  # Get chunk data
+  df <- plankton[[i]]
+  
+  # Count points per image
+  n_pts <- df %>% count(img_name)
+  
+  # Generate representative null data
+  # Pick random points within image volumes
+  rand_points <- pbmclapply(1:nrow(n_pts), function(j){
+    # Number of points to sample within image
+    n <- n_pts$n[j]
+    # Draw points
+    d_points <- tibble(
+      x = runif(n = n, min = 1, max = vol$x),
+      y = runif(n = n, min = 1, max = vol$y),
+      z = runif(n = n, min = 1, max = vol$z)
+    ) %>% # Add information for img name
+      mutate(img_name = paste0("img_", str_pad(j, nchar(nrow(n_pts)), pad = "0")))
+  }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
+    bind_rows()
+  
+  # Compute distances
+  dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+  
+  # Sleep
+  Sys.sleep(30)
+  
+  # Return results
+  return(dist_all_rand)
+}) %>% 
+  bind_rows()
+
+message("Done with computing null distances")
 
 
 ## Compare to null data ----

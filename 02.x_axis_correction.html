@@ -3788,7 +3788,8 @@ Note
 <span id="cb32-20"><a href="#cb32-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb32-21"><a href="#cb32-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Save it</span></span>
 <span id="cb32-22"><a href="#cb32-22" aria-hidden="true" tabindex="-1"></a><span class="fu">write_parquet</span>(plankton, <span class="at">sink =</span> <span class="st">&quot;data/02.x_corrected_plankton_clean.parquet&quot;</span>)</span>
-<span id="cb32-23"><a href="#cb32-23" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(plankton_sub, <span class="at">file =</span> <span class="st">&quot;data/02.x_corrected_plankton_sub.Rdata&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb32-23"><a href="#cb32-23" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(plankton_sub, <span class="at">file =</span> <span class="st">&quot;data/02.x_corrected_plankton_sub.Rdata&quot;</span>)</span>
+<span id="cb32-24"><a href="#cb32-24" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(med_corr, <span class="at">file =</span> <span class="st">&quot;data/02.corr_factor.Rdata&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 
@@ -4177,7 +4178,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"loop":false,"closeEffect":"zoom","openEffect":"zoom","selector":".lightbox","descPosition":"bottom"});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","openEffect":"zoom","selector":".lightbox","loop":false,"closeEffect":"zoom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
