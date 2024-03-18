@@ -11,8 +11,15 @@
 #--------------------------------------------------------------------------#
 source("utils.R")
 
+message("Reading data")
+
+# Correct image volume for x-axis
+load("data/02.corr_factor.Rdata")
+vol$x <- vol$x * med_corr
+
 
 ## Subsampling
+sub_sample <- FALSE
 if (sub_sample){
   load("data/00.images_sub.Rdata")
   load("data/02.x_corrected_plankton_sub.Rdata")
@@ -33,24 +40,24 @@ taxa <- plankton %>% pull(taxon) %>% unique() %>% sort()
 
 # list pairs of taxa
 pairs <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 != t2)
-pairs <- pairs %>% slice_head(n = 10)
-#pairs <- pairs %>% slice_sample(n = 100)
 
 
 ## Loop over pairs ----
 #--------------------------------------------------------------------------#
 
-#j = 3
-#j = 85
-start_time = Sys.time()
+message("Computing distances")
+
+i = 100
 # Use indices instead of taxa
-df_inter <- mclapply(1:nrow(pairs), function(j){
+df_inter <- lapply(1:nrow(pairs), function(i){
   
   # Get pair
-  my_pair <- pairs %>% slice(j)
+  my_pair <- pairs %>% slice(i)
   t1 <- my_pair %>% pull(t1)
   t2 <- my_pair %>% pull(t2)
   my_pair_str <- paste(t1, t2, sep = " - ")
+  
+  message(paste0("Processing ", my_pair_str, ", pair ", i, " out of ", nrow(pairs)))
   
   ## Taxon set-up, number of objects per image
   # Keep images where both organisms are present
@@ -73,15 +80,17 @@ df_inter <- mclapply(1:nrow(pairs), function(j){
     t_img_names <- img_both$img_name
     
     # The number of images to generate is now limited by the number of images with both given taxon
-    t_n_img <- min(n_img, nrow(img_both))
+    t_n_img <- nrow(img_both)
+    
+    message("Generating null data")
     
     ## Generate random data for given taxon
     # Pick random points within image volumes
-    rand_points <- mclapply(1:t_n_img, function(i) {
+    rand_points <- pbmclapply(1:t_n_img, function(j) {
       set.seed(seed)
       # Number of points to sample within image
-      n1 <- img_both %>% slice(i) %>% pull(t1) # first taxon
-      n2 <- img_both %>% slice(i) %>% pull(t2) # second taxon
+      n1 <- img_both %>% slice(j) %>% pull(t1) # first taxon
+      n2 <- img_both %>% slice(j) %>% pull(t2) # second taxon
       
       n_tot <- n1 + n2 # total number of points
       # Draw points
@@ -96,14 +105,14 @@ df_inter <- mclapply(1:nrow(pairs), function(j){
         transform(taxon = sample(taxon)) %>% 
         as_tibble() %>% 
         # Add information for img name
-        mutate(img_name = paste0("img_", str_pad(i, nchar(t_n_img), pad = "0")))
-    }, mc.cores = n_cores)
+        mutate(img_name = paste0("img_", str_pad(j, nchar(t_n_img), pad = "0")))
+    }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
+      bind_rows()
     
-
-    # Store this in a df
-    rand_points <- do.call(bind_rows, rand_points)
+    Sys.sleep(30)
     
     # Loop over images and compute distances between all points within each image
+    message("Computing null distances")
     dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
     # Save X-quantiles, depending on the number of observations
     if (nrow(dist_all_rand) > 10000){ # if more than 10,000 distances, save 10000-quantiles
@@ -113,7 +122,10 @@ df_inter <- mclapply(1:nrow(pairs), function(j){
       dist_all_rand <- dist_all_rand$dist
     }
     
+    Sys.sleep(30)
+    
     ## Compute distances between all organisms
+    message("Computing plankton distances")
     # Loop over images and compute distances between all points within each image
     dist_all <- compute_all_dist(t_plankton, n_cores = n_cores)
     # Save X-quantiles, depending on the number of observations
@@ -124,7 +136,10 @@ df_inter <- mclapply(1:nrow(pairs), function(j){
       dist_all <- dist_all$dist
     }
     
+    Sys.sleep(30)
+    
     ## Comparison with null data
+    message("Performing kuiper test")
     # Kuiper-test
     s1 <-  dist_all
     s2 <-  dist_all_rand
@@ -141,20 +156,14 @@ df_inter <- mclapply(1:nrow(pairs), function(j){
       dist_rand = list(dist_all_rand),
     )
   }  
-}, mc.cores = n_cores) %>% 
+}) %>% 
   bind_rows()
 
   
-end_time = Sys.time()
-end_time - start_time
-
-df_inter %>% 
-  ggplot() + 
-  geom_jitter(aes(x = 0, y = p_value, colour = str_detect(pair, "Acant")))
-
-
 ## Reformat results ----
 #--------------------------------------------------------------------------#
+message("Reformating")
+
 # One big df with distances
 df_inter_dist <- df_inter %>% 
   pivot_longer(c(dist, dist_rand)) %>% 
@@ -169,4 +178,5 @@ df_inter <- df_inter %>% select(-c(dist, dist_rand))
 
 ## Save results ----
 #--------------------------------------------------------------------------#
+message("Saving")
 save(df_inter, df_inter_dist, file = "data/07.inter_distances.Rdata")
