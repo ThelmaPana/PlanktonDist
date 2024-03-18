@@ -290,6 +290,7 @@ All these tests are performed on one image only.
 Pick one image, apply various correction factors to `x` values, compute distances for all correction factors, assess how distances are wrong compared to the uncorrected image.
 
 ```{r apply}
+#| include: false
 # Use only one image
 rand_points <- rand_points %>%  filter(img_name == "img_00001")
 
@@ -412,7 +413,8 @@ How does this error relate to the error caused by flattening the `z` axis?
 
 Have a look at the distribution error in `z` for the same image.
 
-```{r z_error}
+```{r z_error_comp}
+#| include: false
 dist_all_2d <- compute_all_dist(rand_points, z_dim = FALSE)
 dist_all_3d <- compute_all_dist(rand_points, z_dim = TRUE)
 
@@ -421,8 +423,9 @@ df_z <- dist_all_2d %>%
   select(img_name, dist_2D = dist) %>% 
   bind_cols(dist_all_3d %>% select(dist_3D = dist)) %>% 
   mutate(error = (dist_3D - dist_2D)/dist_2D)
+```
 
-
+```{r z_error_plot}
 ggplot(df_z) + 
   geom_histogram(aes(x = error), binwidth = 1) + 
   labs(x = "Relative error in z") + 
@@ -433,7 +436,6 @@ ggplot(df_z) +
   labs(x = "Relative error in z") + 
   scale_x_continuous(labels = label_percent(), expand = c(0,0), limits = c(0, 1.1))
 summary(df_z$error)
-
 ```
 
 A few points have very strong `z` axis error (far away in 3D but very close in 2D), but most errors are \< 100%.
@@ -558,15 +560,12 @@ The larger the correction factor, the larger the error.
 
 The median relative absolute error is `r percent(round(median(abs(med_dist$error)), digits = 2))`, which is very small compared to the error caused by the lack of information in the `z` axis.
 
-## Apply the single correction factor to data
+## Apply the single correction factor to plankton data
 
 Let’s apply the correction factor to ISIIS and null data, i.e. multiply `x` axis values by `r med_corr`. We also recompute distances between null data points.
 
 ```{r apply_corr}
 #| cache.lazy: false
-# Load null data
-load("data/01.null_data.Rdata")
-rm(dist_all_rand)
 # Load plankton
 plankton <- read_parquet("data/00.plankton_clean.parquet")
 # Load subsampled plankton
@@ -575,7 +574,7 @@ load("data/00.plankton_sub.Rdata")
 
 # Apply correction factor to null and plankton data
 # For plankton, we also apply the correction factor to width
-rand_points <- rand_points %>% mutate(x = x * med_corr)
+#rand_points <- rand_points %>% mutate(x = x * med_corr)
 plankton <- plankton %>% 
   mutate(
     x = x * med_corr,
@@ -587,11 +586,7 @@ plankton_sub <- plankton_sub %>%
     width = width * med_corr
   )
 
-# Compute distances in null data
-dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
-
 # Save it
-save(dist_all_rand, rand_points, file = "data/02.x_corrected_null_data.Rdata")
 write_parquet(plankton, sink = "data/02.x_corrected_plankton_clean.parquet")
 save(plankton_sub, file = "data/02.x_corrected_plankton_sub.Rdata")
 ```
