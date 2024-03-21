@@ -10,15 +10,16 @@
 ## Set-up and read data ----
 #--------------------------------------------------------------------------#
 source("utils.R")
+#set.seed(seed)
 
+message("Reading data")
 
 # Correct image volume for x-axis
 load("data/02.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
 
-message("Reading data")
-sub_sample <- FALSE
+sub_sample <- TRUE
 
 ## Subsampling
 if (sub_sample){
