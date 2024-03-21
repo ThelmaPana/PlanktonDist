@@ -18,61 +18,26 @@ execute:
 source("utils.R")
 ```
 
-Load computed distances.
+List saved distances and ream them.
 
 ```{r load}
-# intertaxa
-load("data/07.inter_distances.Rdata")
+## Inter distances
+# list processed files
+processed <- list.files("data", pattern = "07.sub", full.names = TRUE)
 
-# Overall
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_inter <- res[1,] %>% bind_rows()
+# get distances (2nd line)
+df_inter_dist <- res[2,] %>% bind_rows()
+
+## Overall distances
 load("data/03.all_distances.Rdata")
 ```
 
 Plot test stat
-
-```{r}
-toto <- df_inter %>% 
-  filter(str_detect(pair, "Acant")) %>% 
-  filter(str_detect(pair, "App"))
-
-titi <- df_inter_dist %>% 
-  filter(str_detect(pair, "Acant")) %>% 
-  filter(str_detect(pair, "App"))
-toto
-```
-
-```{r}
-titi
-```
-
-```{r}
-titi %>% 
-  pivot_longer(c(dist, dist_rand), values_to = "dist") %>% 
-  mutate(data = ifelse(name == "dist_rand", "null", "pair")) %>% 
-  ggplot() + 
-  stat_ecdf(aes(x = dist, colour = data)) +
-  facet_wrap(~pair)
-```
-
-```{r}
-titi %>% 
-  ggplot() + 
-  stat_ecdf(aes(x = dist, colour = pair)) +
-  labs(title = "Distances for pair")
-```
-
-```{r}
-titi %>% 
-  ggplot() + 
-  stat_ecdf(aes(x = dist_rand, colour = pair)) +
-  labs(title = "Random distances for pair")
-```
-
-```{r}
-s1 <- titi %>% filter(pair == "Acantharea - Appendicularia") %>% pull(dist_rand)
-s2 <- titi %>% filter(pair == "Appendicularia - Acantharea") %>% pull(dist_rand)
-kuiper_test(s1, s2)
-```
 
 ```{r}
 df_inter %>% 
@@ -86,6 +51,7 @@ df_inter %>%
 
 ```{r}
 df_inter %>% 
+  filter(test_stat > 0.2) %>% 
   ggplot() +
   geom_col(aes(x = pair, y = test_stat, fill = n_obj)) +
   geom_hline(yintercept = df_all$test_stat, colour = "red") +
@@ -93,10 +59,26 @@ df_inter %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+Plot distributions
+
 ```{r}
-df_inter %>% 
-  ggplot() +
-  geom_col(aes(x = pair, y = p_value, fill = n_img)) +
-  scale_fill_viridis_c(trans = "log10") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+df_inter_dist %>% 
+  left_join(df_inter) %>% 
+  filter(test_stat > 0.2) %>% 
+  pivot_longer(dist:dist_rand) %>% 
+  ggplot() + 
+  geom_density(aes(x = value, colour = name)) +
+  facet_wrap(~pair)
+```
+
+Plot ECDF
+
+```{r}
+df_inter_dist %>% 
+  left_join(df_inter) %>% 
+  filter(test_stat > 0.2) %>% 
+  pivot_longer(dist:dist_rand) %>% 
+  ggplot() + 
+  stat_ecdf(aes(x = value, colour = name)) +
+  facet_wrap(~pair)
 ```
