@@ -9,9 +9,10 @@
 
 ## Set-up and read data ----
 #--------------------------------------------------------------------------#
-message("Reading data")
-
 source("utils.R")
+set.seed(seed)
+
+message("Reading data")
 
 # Correct image volume for x-axis
 load("data/02.corr_factor.Rdata")
@@ -87,8 +88,6 @@ plankton <- plankton %>% left_join(img_chunks, by = join_by(img_name, taxon))
 # Loop over plankton groups, and then chunk
 message("Computing plankton distances")
 
-taxa <- taxa[1:2]
-my_taxon <- taxa[1]
 
 df_intra <- lapply(taxa, function(my_taxon){
 
