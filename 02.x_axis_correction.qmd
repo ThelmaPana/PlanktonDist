@@ -20,7 +20,7 @@ execute:
 source("utils.R")
 load("data/01.null_data.Rdata")
 
-read_from_ecotaxa <- FALSE # whether to read solitary collodaria from Ecotaxa
+read_from_ecotaxa <- TRUE # whether to read solitary collodaria from Ecotaxa
 ```
 
 ```{python py_set_up}
@@ -292,7 +292,7 @@ Pick one image, apply various correction factors to `x` values, compute distance
 ```{r apply}
 #| include: false
 # Use only one image
-rand_points <- rand_points %>%  filter(img_name == "img_00001")
+rand_points <- rand_points %>% filter(img_name == "img_00001")
 
 # Get all correction factors from solitary collodaria
 corr_factors <- sol_col %>% filter(group == "solitaryblack") %>% pull(ratio)

@@ -23,7 +23,7 @@ List saved distances and ream them.
 ```{r load}
 ## Inter distances
 # list processed files
-processed <- list.files("data", pattern = "07.sub", full.names = TRUE)
+processed <- list.files("data", pattern = "07.", full.names = TRUE)
 
 # load data
 res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
@@ -41,22 +41,28 @@ Plot test stat
 
 ```{r}
 df_inter %>% 
-  filter(str_detect(pair, "Acant")) %>% 
-  ggplot() +
-  geom_col(aes(x = pair, y = test_stat, fill = n_img)) +
-  geom_hline(yintercept = df_all$test_stat, colour = "red") +
-  scale_fill_viridis_c(trans = "log10") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
+  ggplot() + 
+  geom_raster(aes(x = t1, y = t2, fill = test_stat)) +
+  scale_fill_viridis_c()
 ```
+
+Plot number of objects.
 
 ```{r}
 df_inter %>% 
-  filter(test_stat > 0.2) %>% 
-  ggplot() +
-  geom_col(aes(x = pair, y = test_stat, fill = n_obj)) +
-  geom_hline(yintercept = df_all$test_stat, colour = "red") +
-  scale_fill_viridis_c(trans = "log10") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
+  ggplot() + 
+  geom_raster(aes(x = t1, y = t2, fill = n_obj)) +
+  scale_fill_viridis_c(trans = "log1p")
+```
+
+Test stat VS number of objects
+
+```{r}
+ggplot(df_inter) + 
+  geom_point(aes(x = n_obj, y = test_stat, colour = str_detect(pair, "Collodaria_colonial"))) +
+  scale_x_log10() + scale_y_log10()
 ```
 
 Plot distributions
@@ -64,7 +70,7 @@ Plot distributions
 ```{r}
 df_inter_dist %>% 
   left_join(df_inter) %>% 
-  filter(test_stat > 0.2) %>% 
+  filter(test_stat > 0.1) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() + 
   geom_density(aes(x = value, colour = name)) +
@@ -76,7 +82,7 @@ Plot ECDF
 ```{r}
 df_inter_dist %>% 
   left_join(df_inter) %>% 
-  filter(test_stat > 0.2) %>% 
+  filter(test_stat > 0.1) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() + 
   stat_ecdf(aes(x = value, colour = name)) +

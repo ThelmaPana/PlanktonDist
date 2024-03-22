@@ -52,7 +52,7 @@ rsconnect/
 draft*
 
 # Data
-data/
+data*
 
 # Old stuff
 old/
