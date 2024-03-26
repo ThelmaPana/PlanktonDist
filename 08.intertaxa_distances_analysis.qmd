@@ -33,6 +33,10 @@ df_inter <- res[1,] %>% bind_rows()
 # get distances (2nd line)
 df_inter_dist <- res[2,] %>% bind_rows()
 
+# Ignore colonial Collodaria
+#df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
+#df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
+
 ## Overall distances
 load("data/03.all_distances.Rdata")
 ```
@@ -44,7 +48,8 @@ df_inter %>%
   separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
   ggplot() + 
   geom_raster(aes(x = t1, y = t2, fill = test_stat)) +
-  scale_fill_viridis_c()
+  scale_fill_viridis_c() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Plot number of objects.
@@ -54,7 +59,8 @@ df_inter %>%
   separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
   ggplot() + 
   geom_raster(aes(x = t1, y = t2, fill = n_obj)) +
-  scale_fill_viridis_c(trans = "log1p")
+  scale_fill_viridis_c(trans = "log1p") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Test stat VS number of objects
@@ -62,6 +68,7 @@ Test stat VS number of objects
 ```{r}
 ggplot(df_inter) + 
   geom_point(aes(x = n_obj, y = test_stat, colour = str_detect(pair, "Collodaria_colonial"))) +
+  labs(colour = "Collo_col") +
   scale_x_log10() + scale_y_log10()
 ```
 
