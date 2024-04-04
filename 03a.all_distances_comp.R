@@ -19,7 +19,7 @@ load("data/01.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
 
-sub_sample <- FALSE
+sub_sample <- TRUE
 
 ## Subsampling
 if (sub_sample){
@@ -154,7 +154,6 @@ df_all <- tibble(
   n_obj = nrow(plankton),
   n_img = nrow(images),
   n_dist = n_dist,
-  n_dist_rand = n_dist_rand,
   test_stat = out[1],
   p_value = out[2],
   dist = list(dist_all),
@@ -162,5 +161,11 @@ df_all <- tibble(
 )
 
 # Save
-save(df_all, file = "data/03.all_distances.Rdata")
+if (sub_sample){
+  save(df_all, file = "data/03.all_distances_sub.Rdata")  
+} else {
+  save(df_all, file = "data/03.all_distances.Rdata")
+}
+
+
 

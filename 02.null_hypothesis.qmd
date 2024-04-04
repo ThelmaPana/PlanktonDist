@@ -325,3 +325,9 @@ ggplot(f_val_dist) +
   geom_boxplot(aes(x = n_dist, y = test_stat, group = n_dist)) +
   scale_x_log10() + scale_y_log10() 
 ```
+
+Save results
+
+```{r save}
+save(f_val_dist, file = "data/02.f_val_dist.Rdata")
+```

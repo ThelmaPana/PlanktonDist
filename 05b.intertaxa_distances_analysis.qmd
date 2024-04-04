@@ -39,6 +39,7 @@ df_inter_dist <- res[2,] %>% bind_rows()
 
 ## Overall distances
 load("data/03.all_distances.Rdata")
+load("data/02.f_val_dist.Rdata")
 ```
 
 Plot test stat
@@ -66,8 +67,8 @@ df_inter %>%
 Test stat VS number of objects
 
 ```{r}
-ggplot(df_inter) + 
-  geom_point(aes(x = n_obj, y = test_stat, colour = str_detect(pair, "Collodaria_colonial"))) +
+ggplot() + 
+  geom_point(data = df_inter, aes(x = n_obj, y = test_stat, colour = str_detect(pair, "Collodaria_colonial"))) +
   labs(colour = "Collo_col") +
   scale_x_log10() + scale_y_log10()
 ```

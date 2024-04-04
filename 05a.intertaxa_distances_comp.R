@@ -132,9 +132,10 @@ walk(taxa, function(my_taxon) {
       
       # Loop over images and compute distances between all points within each image
       message("Computing null distances")
-      dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+      dist_all_rand <- compute_all_dist_inter(rand_points, n_cores = n_cores)
+      n_dist_rand <- nrow(dist_all_rand)
       # Save X-quantiles, depending on the number of observations
-      if (nrow(dist_all_rand) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      if (n_dist_rand > 10000){ # if more than 10,000 distances, save 10000-quantiles
         probs <- seq(0, 1, length.out = 10000)
         dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
       } else { # otherwise, keep all values
@@ -146,9 +147,10 @@ walk(taxa, function(my_taxon) {
       ## Compute distances between all organisms
       message("Computing plankton distances")
       # Loop over images and compute distances between all points within each image
-      dist_all <- compute_all_dist(t_plankton, n_cores = n_cores)
+      dist_all <- compute_all_dist_inter(t_plankton, n_cores = n_cores)
+      n_dist <- nrow(dist_all)
       # Save X-quantiles, depending on the number of observations
-      if (nrow(dist_all) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+      if (n_dist > 10000){ # if more than 10,000 distances, save 10000-quantiles
         probs <- seq(0, 1, length.out = 10000)
         dist_all <- quantile(dist_all$dist, probs = probs, names = FALSE)
       } else { # otherwise, keep all values
@@ -169,6 +171,7 @@ walk(taxa, function(my_taxon) {
         pair = my_pair_str,
         n_obj = nrow(t_plankton),
         n_img = t_n_img,
+        n_dist = n_dist,
         test_stat = out[1],
         p_value = out[2],
         dist = list(dist_all),
