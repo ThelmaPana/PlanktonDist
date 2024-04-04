@@ -24,6 +24,7 @@ Load computed distances
 ```{r read}
 #| cache.lazy: false
 load("data/03.all_distances.Rdata")
+load("data/02.f_val_dist.Rdata")
 ```
 
 Plot distribution
@@ -55,6 +56,15 @@ Here is the result of the kuiper test.
 ```{r kuiper}
 df_all$test_stat
 df_all$p_value
+```
+
+How does this compare to Kuiper test stats performed on null data with the same number of distances.
+
+```{r f_val_dist}
+ggplot() + 
+  geom_boxplot(data = f_val_dist, aes(x = n_dist, y = test_stat, group = n_dist), colour = "gray") +
+  geom_point(data = df_all, aes(x = n_dist, y = test_stat), colour = "red") +
+  scale_x_log10() + scale_y_log10()
 ```
 
 ::: {.callout-note icon="false"}

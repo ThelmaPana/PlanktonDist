@@ -22,10 +22,9 @@ Load computed distances.
 
 ```{r load}
 # Intrataxa
-load("data/04.intra_distances.Rdata")
+load("data/04.intra_distances_sub.Rdata")
 
-# Overall
-load("data/03.all_distances.Rdata")
+load("data/02.f_val_dist.Rdata")
 ```
 
 Plot test stat
@@ -34,7 +33,6 @@ Plot test stat
 df_intra %>% 
   ggplot() +
   geom_col(aes(x = taxon, y = test_stat, fill = n_obj)) +
-  geom_hline(yintercept = df_all$test_stat, colour = "red") +
   scale_fill_viridis_c(trans = "log10") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -42,9 +40,9 @@ df_intra %>%
 ```{r}
 #| fig-column: body-outset
 #| out-width: 100%
-df_intra %>% 
-  ggplot() + 
-  geom_point(aes(x = n_img, y = test_stat, colour = taxon)) +
+ggplot() + 
+  geom_boxplot(data = f_val_dist, aes(x = n_dist, y = test_stat, group = n_dist), colour = "gray") +
+  geom_point(data = df_intra, aes(x = n_dist, y = test_stat, colour = taxon)) +
   scale_x_log10() + scale_y_log10()
 ```
 
