@@ -15,22 +15,22 @@ source("utils.R")
 message("Reading data")
 
 # Correct image volume for x-axis
-load("data/02.corr_factor.Rdata")
+load("data/01.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
 
-sub_sample <- TRUE
+sub_sample <- FALSE
 
 ## Subsampling
 if (sub_sample){
   load("data/00.images_sub.Rdata")
-  load("data/02.x_corrected_plankton_sub.Rdata")
+  load("data/01.x_corrected_plankton_sub.Rdata")
   images <- images_sub
   plankton <- plankton_sub
 } else {
   ## All data
   images <- read_parquet("data/00.images_clean.parquet")
-  plankton <- read_parquet("data/02.x_corrected_plankton_clean.parquet")
+  plankton <- read_parquet("data/01.x_corrected_plankton_clean.parquet")
 }
 
 
@@ -131,6 +131,10 @@ message("Done with computing null distances")
 #--------------------------------------------------------------------------#
 message("Comparing to null data")
 
+# Keep track of number of computed distances
+n_dist <- nrow(dist_all)
+n_dist_rand <- nrow(dist_all_rand)
+
 # First, we extract 10000-quantiles
 probs <- seq(0, 1, length.out = 10000)
 dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
@@ -153,6 +157,8 @@ df_all <- tibble(
   p_value = out[2],
   dist = list(dist_all),
   dist_rand = list(dist_all_rand),
+  n_dist = n_dist,
+  n_dist_rand = n_dist_rand
 )
 
 # Save
