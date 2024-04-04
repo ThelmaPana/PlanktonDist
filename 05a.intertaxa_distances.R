@@ -15,7 +15,7 @@ set.seed(seed)
 message("Reading data")
 
 # Correct image volume for x-axis
-load("data/02.corr_factor.Rdata")
+load("data/01.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
 
@@ -23,13 +23,13 @@ vol$x <- vol$x * med_corr
 sub_sample <- FALSE
 if (sub_sample){
   load("data/00.images_sub.Rdata")
-  load("data/02.x_corrected_plankton_sub.Rdata")
+  load("data/01.x_corrected_plankton_sub.Rdata")
   images <- images_sub
   plankton <- plankton_sub
 } else {
   ## All data
   images <- read_parquet("data/00.images_clean.parquet")
-  plankton <- read_parquet("data/02.x_corrected_plankton_clean.parquet")
+  plankton <- read_parquet("data/01.x_corrected_plankton_clean.parquet")
 }
 
 # list img names
@@ -58,6 +58,8 @@ processed <- sapply(taxa, function(i) {any(str_detect(saved, i))}, USE.NAMES = F
 taxa <- taxa[!processed]
 
 
+## Compute distances ----
+#--------------------------------------------------------------------------#
 walk(taxa, function(my_taxon) {
   message(paste0("Processing ", my_taxon))
 

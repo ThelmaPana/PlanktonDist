@@ -153,12 +153,12 @@ df_all <- tibble(
   taxon = "all",
   n_obj = nrow(plankton),
   n_img = nrow(images),
+  n_dist = n_dist,
+  n_dist_rand = n_dist_rand,
   test_stat = out[1],
   p_value = out[2],
   dist = list(dist_all),
-  dist_rand = list(dist_all_rand),
-  n_dist = n_dist,
-  n_dist_rand = n_dist_rand
+  dist_rand = list(dist_all_rand)
 )
 
 # Save

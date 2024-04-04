@@ -15,20 +15,20 @@ set.seed(seed)
 message("Reading data")
 
 # Correct image volume for x-axis
-load("data/02.corr_factor.Rdata")
+load("data/01.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
-sub_sample <- F
+sub_sample <- FALSE
 ## Subsampling
 if (sub_sample){
   load("data/00.images_sub.Rdata")
-  load("data/02.x_corrected_plankton_sub.Rdata")
+  load("data/01.x_corrected_plankton_sub.Rdata")
   images <- images_sub
   plankton <- plankton_sub
 } else {
   ## All data
   images <- read_parquet("data/00.images_clean.parquet")
-  plankton <- read_parquet("data/02.x_corrected_plankton_clean.parquet")
+  plankton <- read_parquet("data/01.x_corrected_plankton_clean.parquet")
 }
 
 
@@ -164,8 +164,10 @@ df_intra <- lapply(taxa, function(my_taxon){
   Sys.sleep(30)
   
   ## Compute 10000-quantiles
+  # Number of computed distances
+  n_dist <- nrow(dist_all)
   # Save X-quantiles, depending on the number of observations
-  if (nrow(dist_all) > 10000){ # if more than 10,000 distances, save 10000-quantiles
+  if (n_dist > 10000){ # if more than 10,000 distances, save 10000-quantiles
     probs <- seq(0, 1, length.out = 10000)
     dist_plank <- quantile(dist_all$dist, probs = probs, names = FALSE)
     dist_null <- quantile(dist_all$rand_dist, probs = probs, names = FALSE)
@@ -183,6 +185,7 @@ df_intra <- lapply(taxa, function(my_taxon){
     taxon = my_taxon,
     n_obj = nrow(t_plankton),
     n_img = t_n_img,
+    n_dist = n_dist,
     test_stat = out[1],
     p_value = out[2],
     dist = list(dist_plank),
