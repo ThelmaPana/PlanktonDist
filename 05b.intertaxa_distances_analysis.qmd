@@ -60,7 +60,7 @@ df_inter %>%
   ggplot() + 
   geom_raster(aes(x = t1, y = t2, fill = n_img)) +
   scale_fill_viridis_c(trans = "log1p") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))a
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Test stat VS number of objects
