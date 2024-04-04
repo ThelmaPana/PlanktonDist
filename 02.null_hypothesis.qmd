@@ -1,0 +1,327 @@
+---
+title: "Generate random data for null hypothesis"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+::: callout-note
+## Aims
+
+1.  See how the distribution of distances between random points look like. This null data is not used for comparison with true distances, representative null datasets are generated on the fly when computing plankton distances.
+
+2.  Check that two null datasets with the same number of images have the same distance distribution.
+
+3.  Assess the effect of the number of distances (& number of images) on the Kuiper test statistic.
+:::
+
+```{r read}
+#| cache.lazy: false
+
+## Load data
+images <- read_parquet("data/00.images_clean.parquet")
+plankton <- read_parquet("data/01.x_corrected_plankton_clean.parquet")
+load("data/01.corr_factor.Rdata")
+
+# list img names
+img_names <- sort(unique(images$img_name))
+
+## Apply correction factor in x
+vol$x <- vol$x * med_corr
+```
+
+## Distribution of distances between objects if they are randomly distributed.
+
+First, we need to generate a null dataset that is representative of the true dataset in terms of number of objects per image.
+
+### Number of objects per image
+
+```{r count_obj}
+# Number of objects per image
+counts <- plankton %>% count(img_name)
+ggplot(counts) + geom_histogram(aes(x = n), bins = 100)
+```
+
+Let’s generate `r n_img` images with a similar distribution of number of objects per image.
+
+```{r n_pts}
+n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
+```
+
+### Distances between random objects
+
+Generate our random data.
+
+```{r pick_rand}
+set.seed(seed)
+# Pick random points within image volumes
+rand_points <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+```
+
+Compute and plot distances between all objects within each image.
+
+```{r rand_dist}
+#| output: false 
+# Loop over images and compute distances between all points within each image
+dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+
+# Save it
+save(dist_all_rand, rand_points, file = "data/02.null_data.Rdata")
+```
+
+```{r plot_rand_dist}
+# Plot all
+ggplot(dist_all_rand) + 
+  geom_density(aes(x = dist)) +
+  labs(title = "Density distribution of distances for a random distribution")
+```
+
+## Check that two independent sets of null data return the same results.
+
+```{r two_sets}
+#| output: false 
+# Pick random points within image volumes
+set.seed(seed + 1)
+set_1 <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+
+# Pick random points within image volumes
+set.seed(seed + 2)
+set_2 <- mclapply(1:n_img, function(i){
+  # Number of points to sample within image
+  n <- n_pts[i]
+  # Draw points
+  d_points <- tibble(
+    x = runif(n = n, min = 1, max = vol$x),
+    y = runif(n = n, min = 1, max = vol$y),
+    z = runif(n = n, min = 1, max = vol$z)
+  ) %>% # Add information for img name
+  mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+
+
+## Compute distances
+dist_1 <- compute_all_dist(set_1, n_cores = n_cores)
+dist_2 <- compute_all_dist(set_2, n_cores = n_cores)
+```
+
+```{r two_sets_plot}
+sets <- bind_rows(
+  dist_1 %>% mutate(set = "1"),
+  dist_2 %>% mutate(set = "2")
+) 
+
+sets %>% 
+  ggplot() +
+  geom_density(aes(x = dist, colour = set)) +
+  labs(title = "Density distribution of distances for two random distributions")
+```
+
+```{r two_set_comp}
+# Extract 10000-quantiles to perform comparison
+probs <- seq(0, 1, length.out = 10000)
+dist_1 <- quantile(dist_1$dist, probs = probs, names = FALSE)
+dist_2 <- quantile(dist_2$dist, probs = probs, names = FALSE)
+
+tibble(dist = dist_1, set = "1") %>% 
+  bind_rows(tibble(dist = dist_2, set = "2")) %>%   
+  ggplot(aes(dist, colour = set)) +
+  stat_ecdf(geom = "step")
+
+kuiper_test(dist_1, dist_2)
+```
+
+## Effect of number of distances on Kuiper test statistic
+
+The maximum number of distances in intertaxa analyses will be around 10⁷. Let’s then generate 10 sets of null data with a number of distances reaching 10⁷. Then, by removing some images from these datasets, we can see how the F-value varies depending on the number of images.
+
+### Find the appropriate number of images to generate
+
+Let’s try to find a relationship between the number of images and the number of computed distances, so that we can find the appropriate number of images to generate to compute between 10³ and 10⁷ distances.
+
+```{r find_n_img}
+# Count number of distances per image in null data
+count_dist <- dist_all_rand %>% 
+  count(img_name, name = "n_dist") %>% 
+  mutate(
+    n_img = 1,
+    cum_n_img = cumsum(n_img),
+    cum_n_dist = cumsum(n_dist)
+  ) 
+
+ggplot(count_dist, aes(x = cum_n_img, y = cum_n_dist)) +
+  geom_point(size = 0.5)
+
+# Seems like a nice linear relationship, let’s fit a model and extract coefficients
+mod_lm <- lm(cum_n_dist ~ cum_n_img + 0, data = count_dist)
+mod_lm$coefficients
+
+# Thus we have:
+# n_dist = 786.8141*n_img
+# n_img = n_dist / 786.8141
+# with n_dist between 10^2 10^7
+
+# We target the following number of distances
+n_tar_dist <- c(1e2, 1e3, 1e4, 1e5, 1e6, 1e7)
+# Let’s find the number of images for each
+sapply(n_tar_dist, function(x) {x /  786.8141})
+# We need about 0.1 to 13,000 images. Let’s take this to 1 to 14,000 just to be sure.
+```
+
+We need to generate 10 representative null datasets of 140,000 images each. We will be using subsets of:
+
+-   2 images -\> 10² distances
+
+-   14 images -\> 10³ distances
+
+-   140 images -\> 10⁴ distances
+
+-   1,400 images -\> 10⁵ distances
+
+-   14,000 images -\> 10⁶ distances
+
+-   140,000 images -\> 10⁷ distances
+
+### Generate null datasets
+
+```{r generate_null_data}
+
+n_img <- 14000 # Number of images to generate
+n_sets <- 10 # Number of datasets to generate
+
+# Representative number of objets per images
+n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
+
+# Generate sets of random images
+rand_points <- lapply(1:n_sets, function(i_set) {
+  # Pick random points within image volumes
+  mclapply(1:n_img, function(i){
+    # Number of points to sample within image
+    n <- n_pts[i]
+    # Draw points
+    d_points <- tibble(
+      x = runif(n = n, min = 1, max = vol$x),
+      y = runif(n = n, min = 1, max = vol$y),
+      z = runif(n = n, min = 1, max = vol$z)
+    ) %>% # Add information for img name
+    mutate(img_name = paste0("img_", str_pad(i, nchar(n_img), pad = "0")))
+  }, mc.cores = n_cores) %>% 
+    bind_rows()
+})
+```
+
+### Compute distances
+
+Within each set, compute distances within each image.
+
+```{r comp_dist}
+dist_rand <- lapply(rand_points, compute_all_dist)
+
+# Size of subsets
+dist_count <- dist_rand[[1]] %>% count(img_name) %>% mutate(n_cum = cumsum(n))
+
+# List images to retain for each target
+img_lists <- lapply(n_tar_dist, function(n_tar) {
+  dist_count %>% 
+  # keep image to reach the number of target distances
+  mutate(keep = lag(n_cum < n_tar, default = TRUE)) %>%
+  filter(keep) %>% 
+  pull(img_name)
+})
+
+
+# Pair of sets to compare
+set_pairs <- crossing(set_a = 1:n_sets, set_b = 1:n_sets) %>% filter(set_a < set_b)
+
+# Loop on pairs of sets and perform kuiper test on each subset
+f_val_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
+  
+  # Get sets of interest
+  i_set_a <- set_pairs %>% slice(i) %>% pull(set_a)
+  i_set_b <- set_pairs %>% slice(i) %>% pull(set_b)
+  set_a <- dist_rand[[i_set_a]]
+  set_b <- dist_rand[[i_set_b]]
+  
+  # Loop on targets to reach
+  lapply(1:length(n_tar_dist), function(j) {
+
+    # Get list of images of interest
+    tar_img_list <- img_lists[[j]]
+    
+    # Get objects in these images
+    tar_set_a <- set_a %>% filter(img_name %in% tar_img_list)
+    tar_set_b <- set_b %>% filter(img_name %in% tar_img_list)
+    
+    # Subsample to 10-000 quantiles if needed
+    if (nrow(tar_set_a) > 10000) {
+      probs <- seq(0, 1, length.out = 10000)
+      dist_set_a <- quantile(tar_set_a$dist, probs = probs, names = FALSE)
+      dist_set_b <- quantile(tar_set_b$dist, probs = probs, names = FALSE)
+    } else {
+      dist_set_a <- tar_set_a$dist
+      dist_set_b <- tar_set_b$dist
+    }
+    
+    # Perform kuiper test between sets
+    kt <- kuiper_test(dist_set_a, dist_set_b)
+    
+    # Return results
+    tibble(
+      n_dist = nrow(tar_set_a),
+      test_stat = kt[1],
+      set_a = as.factor(i_set_a),
+      set_b = as.factor(i_set_b)
+    )
+  }) %>% 
+    bind_rows()
+}, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
+  bind_rows()
+```
+
+Plot results
+
+```{r plot_res}
+ggplot(f_val_dist) + 
+  geom_point(aes(x = n_dist, y = test_stat)) +
+  scale_x_log10() + scale_y_log10() 
+
+ggplot(f_val_dist) + 
+  geom_boxplot(aes(x = n_dist, y = test_stat, group = n_dist)) +
+  scale_x_log10() + scale_y_log10() 
+```
