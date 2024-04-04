@@ -45,9 +45,9 @@ pairs <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 != t2)
 ## Remove taxa already processed
 # list save files
 if (sub_sample){ # with subsampling
-  saved <- list.files("data/", pattern = "07.sub")  
+  saved <- list.files("data/", pattern = "05.sub")  
 } else { # withouth subsampling
-  saved <- list.files("data/", pattern = "07.inter")
+  saved <- list.files("data/", pattern = "05.inter")
 }
 
 
@@ -192,9 +192,9 @@ walk(taxa, function(my_taxon) {
   
   # Save
   if (sub_sample){ # add a subsampling tag to file name
-    file_name <- paste0("data/07.sub_inter_distances_", my_taxon, ".Rdata")  
+    file_name <- paste0("data/05.sub_inter_distances_", my_taxon, ".Rdata")  
   } else {
-    file_name <- paste0("data/07.sub_inter_distances_", my_taxon, ".Rdata")  
+    file_name <- paste0("data/05.sub_inter_distances_", my_taxon, ".Rdata")  
   }
   save(res_pair, res_pair_dist, file = file_name)
   

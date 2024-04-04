@@ -23,7 +23,7 @@ List saved distances and ream them.
 ```{r load}
 ## Inter distances
 # list processed files
-processed <- list.files("data", pattern = "07.", full.names = TRUE)
+processed <- list.files("data", pattern = "05.", full.names = TRUE)
 
 # load data
 res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
@@ -58,9 +58,9 @@ Plot number of objects.
 df_inter %>% 
   separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
   ggplot() + 
-  geom_raster(aes(x = t1, y = t2, fill = n_obj)) +
+  geom_raster(aes(x = t1, y = t2, fill = n_img)) +
   scale_fill_viridis_c(trans = "log1p") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))a
 ```
 
 Test stat VS number of objects
@@ -77,7 +77,7 @@ Plot distributions
 ```{r}
 df_inter_dist %>% 
   left_join(df_inter) %>% 
-  filter(test_stat > 0.1) %>% 
+  filter(test_stat > 0.2) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() + 
   geom_density(aes(x = value, colour = name)) +
