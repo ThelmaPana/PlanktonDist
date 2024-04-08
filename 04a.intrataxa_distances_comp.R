@@ -88,8 +88,10 @@ plankton <- plankton %>% left_join(img_chunks, by = join_by(img_name, taxon))
 # Loop over plankton groups, and then chunk
 message("Computing plankton distances")
 
+walk(taxa, function(my_taxon) {
+  
 
-df_intra <- lapply(taxa, function(my_taxon){
+#df_intra <- lapply(taxa, function(my_taxon){
 
   # Inform user
   message(paste("Processing",  my_taxon))
@@ -180,7 +182,8 @@ df_intra <- lapply(taxa, function(my_taxon){
   # Kuiper-test
   out <-  kuiper_test(dist_plank, dist_null)
   
-  # Return outputs
+  ## Reformat and save output for given taxon
+  message("Reformating & saving")
   res <- tibble(
     taxon = my_taxon,
     n_obj = nrow(t_plankton),
@@ -191,30 +194,31 @@ df_intra <- lapply(taxa, function(my_taxon){
     dist = list(dist_plank),
     dist_rand = list(dist_null),
   )
-  return(res)
+  
+  # One big df with distances
+  res_dist <- res %>% 
+    pivot_longer(c(dist, dist_rand)) %>% 
+    mutate(value = map(value, `length<-`, max(lengths(value)))) %>% 
+    pivot_wider(names_from = name, values_from = value) %>% 
+    unnest(c(dist, dist_rand)) %>% 
+    select(taxon, dist, dist_rand)
+  
+  # One small df with summary
+  res <- res %>% select(-c(dist, dist_rand))
 
-}) %>% 
-  bind_rows()
-
-
-
-## Reformat results ----
-#--------------------------------------------------------------------------#
-message("Reformating")
-
-# One big df with distances
-df_intra_dist <- df_intra %>% 
-  select(taxon, dist, dist_rand) %>% 
-  unnest(c(dist, dist_rand))
-
-# One small df with summary
-df_intra <- df_intra %>% select(-c(dist, dist_rand))
-
-
-## Save results ----
-#--------------------------------------------------------------------------#
-message("Saving")
-
-save(df_intra, df_intra_dist, file = "data/04.intra_distances.Rdata")
-
+  # Save
+  if (sub_sample){ # add a subsampling tag to file name
+    file_name <- paste0("data/04.sub_intra_distances_", my_taxon, ".Rdata")  
+  } else {
+    file_name <- paste0("data/04.intra_distances_", my_taxon, ".Rdata")  
+  }
+  
+  save(res, res_dist, file = file_name)
+  
+  # Clean
+  rm(res, res_dist)
+  gc(verbose = FALSE)
+  
+  Sys.sleep(10)
+}) 
 
