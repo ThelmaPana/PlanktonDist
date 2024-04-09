@@ -70,5 +70,5 @@ ggplot() +
 ::: {.callout-note icon="false"}
 ## Conclusion
 
-**Distances between planktonic organisms at the local scale do not differ from the distances that could be expected if plankton was randomly distributed.**
+**Distances between planktonic organisms at the local scale differ from the distances that could be expected if plankton was randomly distributed.**
 :::

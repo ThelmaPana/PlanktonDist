@@ -58,6 +58,7 @@ df_intra %>%
 ggplot() + 
   geom_boxplot(data = f_val_dist, aes(x = n_dist, y = test_stat, group = n_dist), colour = "gray") +
   geom_point(data = df_intra, aes(x = n_dist, y = test_stat, colour = taxon)) +
+  scale_color_paletteer_d(`"khroma::discreterainbow"`) +
   scale_x_log10() + scale_y_log10()
 ```
 

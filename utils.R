@@ -27,6 +27,7 @@ library(patchwork)
 library(cmocean)
 library(scales)
 library(ggtext)
+library(paletteer)
 
 
 theme_set(theme_minimal())
