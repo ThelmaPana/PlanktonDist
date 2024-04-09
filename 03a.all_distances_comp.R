@@ -7,9 +7,11 @@
 #--------------------------------------------------------------------------#
 
 
+
 ## Set-up and read data ----
 #--------------------------------------------------------------------------#
 source("utils.R")
+rlimit_as(1e11)
 #set.seed(seed)
 
 message("Reading data")
@@ -19,7 +21,7 @@ load("data/01.corr_factor.Rdata")
 vol$x <- vol$x * med_corr
 
 
-sub_sample <- TRUE
+sub_sample <- FALSE
 
 ## Subsampling
 if (sub_sample){
@@ -39,8 +41,8 @@ if (sub_sample){
 message("Generating chunks")
 
 # Break into n pieces of images to process 
-n_chunk <- 6 # number of chunks
-chunk_size <- ceiling(nrow(images) / 7) # size of chunks
+n_chunk <- 10 # number of chunks
+chunk_size <- ceiling(nrow(images) / n_chunk) # size of chunks
 # compute chunks
 images <- images %>% 
   mutate(
@@ -62,83 +64,99 @@ gc(verbose = FALSE)
 #--------------------------------------------------------------------------#
 # Loop over chunks and compute distances between all points within each image
 
-message("Computing plankton distances")
-
-dist_all <- lapply(1:n_chunk, function(i) {
-  message(paste("Processing chunk", i, "out of", n_chunk))
+if (!file.exists("data/03.plankton_dist.parquet")){
+  message("Computing plankton distances")
   
-  # Get chunk data
-  df <- plankton[[i]]
-  # Compute distances
-  dist_all <- compute_all_dist(df, n_cores = n_cores)
-  # Sleep
-  Sys.sleep(30)
+  dist_all <- lapply(1:n_chunk, function(i) {
+    message(paste("Processing chunk", i, "out of", n_chunk))
+    
+    # Get chunk data
+    df <- plankton[[i]]
+    # Compute distances
+    dist_all <- compute_all_dist(df, n_cores = n_cores)
+    # Sleep
+    Sys.sleep(30)
+    
+    
+    # Return results
+    return(dist_all)
+  }) %>% 
+    bind_rows()
   
-  
-  # Return results
-  return(dist_all)
-}) %>% 
-  bind_rows()
-
-message("Done with computing plankton distances")
+  message("Done with computing plankton distances")
+  write_parquet(dist_all, sink = "data/03.plankton_dist.parquet")
+}
 
 
 ## Generate null data and compute distances ----
 #--------------------------------------------------------------------------#
 # Loop over chunks, generate null data and computed distances
-
-message("Computing null distances")
-
-dist_all_rand <- lapply(1:n_chunk, function(i) {
-  message(paste("Processing chunk", i, "out of", n_chunk))
+if (!file.exists("data/03.random_dist.parquet")) {
+  message("Computing null distances")
   
-  # Get chunk data
-  df <- plankton[[i]]
-  
-  # Count points per image
-  n_pts <- df %>% count(img_name)
-  
-  # Generate representative null data
-  # Pick random points within image volumes
-  rand_points <- pbmclapply(1:nrow(n_pts), function(j){
-    # Number of points to sample within image
-    n <- n_pts$n[j]
-    # Draw points
-    d_points <- tibble(
-      x = runif(n = n, min = 1, max = vol$x),
-      y = runif(n = n, min = 1, max = vol$y),
-      z = runif(n = n, min = 1, max = vol$z)
-    ) %>% # Add information for img name
-      mutate(img_name = paste0("img_", str_pad(j, nchar(nrow(n_pts)), pad = "0")))
-  }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
+  dist_all_rand <- lapply(1:n_chunk, function(i) {
+    message(paste("Processing chunk", i, "out of", n_chunk))
+    
+    # Get chunk data
+    df <- plankton[[i]]
+    
+    # Count points per image
+    n_pts <- df %>% count(img_name)
+    
+    message("Generating null data")
+    # Generate representative null data
+    # Pick random points within image volumes
+    rand_points <- pbmclapply(1:nrow(n_pts), function(j){
+      # Number of points to sample within image
+      n <- n_pts$n[j]
+      # Draw points
+      d_points <- tibble(
+        x = runif(n = n, min = 1, max = vol$x),
+        y = runif(n = n, min = 1, max = vol$y),
+        z = runif(n = n, min = 1, max = vol$z)
+      ) %>% # Add information for img name
+        mutate(img_name = paste0("img_", str_pad(j, nchar(nrow(n_pts)), pad = "0")))
+    }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
+      bind_rows()
+    
+    # Sleep
+    Sys.sleep(30)
+    
+    # Compute distances
+    message("Computing null distances")
+    dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+    
+    # Sleep
+    Sys.sleep(30)
+    
+    # Return results
+    return(dist_all_rand)
+  }) %>% 
     bind_rows()
   
-  # Compute distances
-  dist_all_rand <- compute_all_dist(rand_points, n_cores = n_cores)
+  message("Done with computing null distances")
+  write_parquet(dist_all_rand, sink = "data/03.random_dist.parquet")
+}
   
-  # Sleep
-  Sys.sleep(30)
-  
-  # Return results
-  return(dist_all_rand)
-}) %>% 
-  bind_rows()
-
-message("Done with computing null distances")
-
 
 ## Compare to null data ----
 #--------------------------------------------------------------------------#
 message("Comparing to null data")
 
-# Keep track of number of computed distances
-n_dist <- nrow(dist_all)
-n_dist_rand <- nrow(dist_all_rand)
-
-# First, we extract 10000-quantiles
+# 10000-quantiles to be extracted
 probs <- seq(0, 1, length.out = 10000)
-dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
+
+# Load plankton distances
+if (!exists("dist_all")) {dist_all <- read_parquet("data/03.plankton_dist.parquet")}
+# keep track of number of computed distances
+n_dist <- nrow(dist_all)
+# compute quantiles
 dist_all <- quantile(dist_all$dist, probs = probs, names = FALSE)
+
+# Load null distances
+if (!exists("dist_all_rand")) {dist_all_rand <- read_parquet("data/03.random_dist.parquet")}
+# compute quantiles
+dist_all_rand <- quantile(dist_all_rand$dist, probs = probs, names = FALSE)
 
 # Perform kuiper test
 out <- kuiper_test(dist_all, dist_all_rand)

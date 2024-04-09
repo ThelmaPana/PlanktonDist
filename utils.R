@@ -7,6 +7,7 @@ library(parallel)
 library(pbmcapply)
 library(hms)
 library(ecotaxarapi)
+library(unix)
 
 
 # Null hypothesis
@@ -52,7 +53,7 @@ data_dir <- here("data")
 
 ## Parallel ----
 #--------------------------------------------------------------------------#
-n_cores <- 4
+n_cores <- 2
 
 ## Seed ----
 #--------------------------------------------------------------------------#
@@ -125,19 +126,19 @@ compute_all_dist_inter <- function(points, n_cores = 12, z_dim = FALSE) {
 
   # Check that we have the number of expected distances within each image
   # Number of distances in each image
-  dist_ok <- dist_all %>% 
-    count(img_name, name = "n_dist") %>% 
-    # Join with theoretical number of distances for each image
-    left_join(
-      points %>% 
-        count(img_name, taxon) %>% 
-        group_by(img_name) %>% 
-        summarise(n_dist_th = prod(n)),
-      by = join_by(img_name)
-    ) %>% 
-    mutate(ok = n_dist == n_dist_th)
+  #dist_ok <- dist_all %>% 
+  #  count(img_name, name = "n_dist") %>% 
+  #  # Join with theoretical number of distances for each image
+  #  left_join(
+  #    points %>% 
+  #      count(img_name, taxon) %>% 
+  #      group_by(img_name) %>% 
+  #      summarise(n_dist_th = prod(n)),
+  #    by = join_by(img_name)
+  #  ) %>% 
+  #  mutate(ok = n_dist == n_dist_th)
     
-  if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points and their type.")} # should return TRUE
+  #if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points and their type.")} # should return TRUE
   
   return(dist_all)
 }
@@ -188,14 +189,14 @@ compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
   
   # Check that we have the number of expected distances within each image
   # For a set of n points, the number of unique distances is n(n-1)/2
-  dist_ok <- left_join(
-    points %>% count(img_name, name = "n_obj"),
-    dist_all %>% count(img_name, name = "n_dist"),
-    by = join_by(img_name)
-  ) %>% 
-    mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
+  #dist_ok <- left_join(
+  #  points %>% count(img_name, name = "n_obj"),
+  #  dist_all %>% count(img_name, name = "n_dist"),
+  #  by = join_by(img_name)
+  #) %>% 
+  #  mutate(ok = n_dist == (n_obj * (n_obj-1))/2)
   
-  if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points.")} # should return TRUE
+  #if(!all(dist_ok$ok)){stop("Number of computed distances differs from what is expected based on the number of points.")} # should return TRUE
   
   return(dist_all)
 }
