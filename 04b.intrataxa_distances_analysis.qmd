@@ -18,12 +18,27 @@ execute:
 source("utils.R")
 ```
 
-Load computed distances.
+List saved distances and ream them
 
 ```{r load}
-# Intrataxa
-load("data/04.intra_distances_sub.Rdata")
+## Inter distances
+# list processed files
+processed <- list.files("data", pattern = "04.", full.names = TRUE)
 
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_intra <- res[1,] %>% bind_rows()
+# get distances (2nd line)
+df_intra_dist <- res[2,] %>% bind_rows()
+
+# Ignore colonial Collodaria
+#df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
+#df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
+
+## Overall distances
+load("data/03.all_distances.Rdata")
 load("data/02.f_val_dist.Rdata")
 ```
 
