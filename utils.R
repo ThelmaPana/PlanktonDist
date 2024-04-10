@@ -70,6 +70,11 @@ coast <- read_csv(file.path(data_dir, "raw/coast.csv"), show_col_types = FALSE)
 
 ## Functions ----
 #--------------------------------------------------------------------------#
+# Floor and ceil with given precision
+floor_dec <- function(x, level = 1) round(x - 5*10^(-level-1), level)
+ceiling_dec <- function(x, level = 1) round(x + 5*10^(-level-1), level)
+
+
 # Function to increment file numbers in batch
 increment_files <- function(to_increment){
   # List files with this number

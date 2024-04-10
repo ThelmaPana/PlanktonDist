@@ -211,9 +211,11 @@ rq_coef <- tidy(rqfit) %>%
   )) %>% 
   pivot_wider(names_from = "term", values_from = estimate)
 
+# Save quantile reg coefts
+save(rq_coef, file = "data/02b.rq_coef.Rdata")
 
 # Generate data to plot a ribbon between the regression lines
-lim_dist <- c(50, 5*10e9) # extend of the ribbon in x-axis
+lim_dist <- c(5e1, 5e9) # extend of the ribbon in x-axis
 rib_data <- tibble(n_dist = lim_dist) %>% 
   mutate(
     # apply log-transformation
@@ -227,8 +229,6 @@ rib_data <- tibble(n_dist = lim_dist) %>%
   mutate(order = c(1, 2, 4, 3)) %>% 
   arrange(order)
 
-# Save ribbon data for future fplots
-save(rib_data, file = "data/02b.f_val_ribbon.Rdata")
 
 # Plot
 ggplot(f_val_dist) +
