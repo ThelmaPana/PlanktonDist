@@ -18,10 +18,12 @@ execute:
 source("utils.R")
 ```
 
+## Read saved distances
+
 List saved distances and ream them
 
 ```{r load}
-## Inter distances
+## Intra distances
 # list processed files
 processed <- list.files("data", pattern = "04.", full.names = TRUE)
 
@@ -33,36 +35,76 @@ df_intra <- res[1,] %>% bind_rows()
 # get distances (2nd line)
 df_intra_dist <- res[2,] %>% bind_rows()
 
-# Ignore colonial Collodaria
-#df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
-#df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
+## Null distances
+load("data/02a.f_val_dist.Rdata")
+load("data/02b.rq_coef.Rdata")
 
-## Overall distances
-load("data/03.all_distances.Rdata")
-load("data/02.f_val_dist.Rdata")
+## Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+df_intra <- df_intra %>% 
+    mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
 ```
 
-Plot test stat
+## Analyse Kuiper statistic
 
-```{r}
-df_intra %>% 
-  ggplot() +
-  geom_col(aes(x = taxon, y = test_stat, fill = n_obj)) +
-  scale_fill_viridis_c(trans = "log10") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
+Plot test stat VS number of computed distances in a log-transformed space.
 
-```{r}
+```{r f_vs_n_dist}
 #| fig-column: body-outset
 #| out-width: 100%
-ggplot() + 
-  geom_boxplot(data = f_val_dist, aes(x = n_dist, y = test_stat, group = n_dist), colour = "gray") +
-  geom_point(data = df_intra, aes(x = n_dist, y = test_stat, colour = taxon)) +
-  scale_color_paletteer_d(`"khroma::discreterainbow"`) +
-  scale_x_log10() + scale_y_log10()
+
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(
+  floor_dec(min(df_intra$n_dist), level = -(nchar(paste(min(df_intra$n_dist))) - 1)),
+  ceiling_dec(max(df_intra$n_dist), level = -(nchar(paste(max(df_intra$n_dist))) - 1))
+)
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+
+## Plot results
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_intra, aes(x = log_n_dist, y = log_test_stat, fill = taxon, colour = taxon, shape = taxon)) +
+  scale_fill_paletteer_d(`"khroma::discreterainbow"`) +
+  scale_colour_paletteer_d(`"khroma::discreterainbow"`) +
+  scale_shape_manual(values = rep(21:25, 6)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
 ```
 
-Plot all distances.
+Four groups seem to have distances that differ from expected under a random distribution:
+
+-   Acantharea
+
+-   Cop_small
+
+-   Cop_Calanoida
+
+-   Cop_other
+
+Let’s plot their distances.
 
 ```{r all_dist}
 #| fig-column: screen-inset
@@ -70,13 +112,14 @@ Plot all distances.
 #| fig-width: 12
 #| fig-height: 5
 df_intra_dist %>% 
+  filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() +
   geom_density(aes(x = value, colour = name)) +
   facet_wrap(~taxon, scales = "free")
 ```
 
-Plot all ECDF.
+And plot their ECDF.
 
 ```{r all_ecdf}
 #| fig-column: screen-inset
@@ -84,8 +127,11 @@ Plot all ECDF.
 #| fig-width: 12
 #| fig-height: 5
 df_intra_dist %>% 
+  filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() +
   stat_ecdf(aes(x = value, colour = name)) +
   facet_wrap(~taxon, scales = "free")
 ```
+
+For the 4  groups, distances distribution is shifted to the left compared to null distances: individuals are closer to each other than expected under a random distribution.

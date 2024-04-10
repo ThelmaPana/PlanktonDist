@@ -24,7 +24,50 @@ Load computed distances
 ```{r read}
 #| cache.lazy: false
 load("data/03.all_distances.Rdata")
-load("data/02.f_val_dist.Rdata")
+load("data/02a.f_val_dist.Rdata")
+load("data/02b.rq_coef.Rdata")
+
+# Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+df_all <- df_all %>% 
+    mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+```
+
+```{r plot_stat}
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(50, 2e9)
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+
+## Plot results
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_all, aes(x = log_n_dist, y = log_test_stat), colour = "red") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), expand = c(0, 0)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic")
+
 ```
 
 Plot distribution
@@ -49,22 +92,6 @@ df_all %>%
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
   ggplot() + 
   stat_ecdf(aes(x = dist, colour = type))
-```
-
-Here is the result of the kuiper test.
-
-```{r kuiper}
-df_all$test_stat
-df_all$p_value
-```
-
-How does this compare to Kuiper test stats performed on null data with the same number of distances.
-
-```{r f_val_dist}
-ggplot() + 
-  geom_boxplot(data = f_val_dist, aes(x = n_dist, y = test_stat, group = n_dist), colour = "gray") +
-  geom_point(data = df_all, aes(x = n_dist, y = test_stat), colour = "red") +
-  scale_x_log10() + scale_y_log10()
 ```
 
 ::: {.callout-note icon="false"}

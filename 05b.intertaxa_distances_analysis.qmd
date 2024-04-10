@@ -21,7 +21,7 @@ source("utils.R")
 List saved distances and ream them.
 
 ```{r load}
-## Inter distances
+## Intra distances
 # list processed files
 processed <- list.files("data", pattern = "05.", full.names = TRUE)
 
@@ -33,64 +33,84 @@ df_inter <- res[1,] %>% bind_rows()
 # get distances (2nd line)
 df_inter_dist <- res[2,] %>% bind_rows()
 
-# Ignore colonial Collodaria
-#df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
-#df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
+## Null distances
+load("data/02a.f_val_dist.Rdata")
+load("data/02b.rq_coef.Rdata")
 
-## Overall distances
-load("data/03.all_distances.Rdata")
-load("data/02.f_val_dist.Rdata")
-```
+## Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
 
-Plot test stat
-
-```{r}
-df_inter %>% 
-  separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
-  ggplot() + 
-  geom_raster(aes(x = t1, y = t2, fill = test_stat)) +
-  scale_fill_viridis_c() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-Plot number of objects.
-
-```{r}
-df_inter %>% 
-  separate(pair, into = c("t1", "t2"), sep = " - ") %>% 
-  ggplot() + 
-  geom_raster(aes(x = t1, y = t2, fill = n_img)) +
-  scale_fill_viridis_c(trans = "log1p") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+df_inter <- df_inter %>% 
+    mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
 ```
 
 Test stat VS number of objects
 
-```{r}
-ggplot() + 
-  geom_point(data = df_inter, aes(x = n_obj, y = test_stat, colour = str_detect(pair, "Collodaria_colonial"))) +
-  labs(colour = "Collo_col") +
-  scale_x_log10() + scale_y_log10()
+```{r plot}
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(
+  floor_dec(min(df_inter$n_dist), level = -(nchar(paste(min(df_inter$n_dist))) - 1)),
+  ceiling_dec(max(df_inter$n_dist), level = -(nchar(paste(max(df_inter$n_dist))) - 1))
+)
+
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+
+# Detect points above the polygon
+df_inter <- df_inter %>% 
+  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
+
+## Plot results
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter %>% filter(above), aes(x = log_n_dist, y = log_test_stat,  fill = pair, colour = pair, shape = pair)) +
+  geom_point(data = df_inter %>% filter(!above), aes(x = log_n_dist, y = log_test_stat), colour = "grey") +
+  #scale_fill_paletteer_d(`"khroma::discreterainbow"`) +
+  #scale_colour_paletteer_d(`"khroma::discreterainbow"`) +
+  scale_shape_manual(values = rep(21:25, 6)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis", colour = "Pair", fill = "Pair", shape = "Pair") 
 ```
 
-Plot distributions
+Plot distributions of those above the polygon.
 
-```{r}
+```{r plot_dist}
 df_inter_dist %>% 
-  left_join(df_inter) %>% 
-  filter(test_stat > 0.2) %>% 
+  left_join(df_inter, by = join_by(pair)) %>% 
+  filter(above) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() + 
   geom_density(aes(x = value, colour = name)) +
   facet_wrap(~pair)
 ```
 
-Plot ECDF
+Plot ECDF of those above the polygon.
 
-```{r}
+```{r plot_ecdf}
 df_inter_dist %>% 
-  left_join(df_inter) %>% 
-  filter(test_stat > 0.1) %>% 
+  left_join(df_inter, by = join_by(pair)) %>% 
+  filter(above) %>% 
   pivot_longer(dist:dist_rand) %>% 
   ggplot() + 
   stat_ecdf(aes(x = value, colour = name)) +
