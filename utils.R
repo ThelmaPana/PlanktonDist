@@ -13,6 +13,8 @@ library(unix)
 # Null hypothesis
 #library(MASS)
 library(twosamples)
+library(quantreg)
+library(broom)
 
 # Reading data
 library(arrow)
