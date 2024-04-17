@@ -18,7 +18,7 @@ execute:
 source("utils.R")
 ```
 
-List saved distances and ream them.
+## Read saved distances
 
 ```{r load}
 ## Intra distances
@@ -49,9 +49,87 @@ df_inter <- df_inter %>%
     log_n_dist = log10(n_dist),
     log_test_stat = log10(test_stat)
   )
+
+# Detect points above the polygon
+df_inter <- df_inter %>% 
+  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
 ```
 
-Test stat VS number of objects
+## Check intra-pair differences
+
+Look for differences between A-B and B-A.
+
+```{r pair_agree}
+df_inter <- df_inter %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("p1", "p2"), cols_remove = FALSE) %>% 
+  mutate(
+    pair_unsrt = ifelse(
+      p1 < p2,
+      paste(p1, p2, sep = " - "),
+      paste(p2, p1, sep = " - ")
+    ), .after = pair
+  )
+
+df_pair <- df_inter %>% 
+  group_by(pair_unsrt, n_obj, n_img, n_dist) %>% 
+  summarise(
+    diff = max(test_stat) - min(test_stat),
+    agree = case_when(
+      sum(above) == 0 ~ "agree below",
+      sum(above) == 2 ~ "agree above",
+      sum(above) == 1 ~ "disagree"
+  )) %>% 
+  ungroup()
+
+df_pair %>% count(agree)
+```
+
+3 pairs are in disagreement in A-B VS B-A. Let’s have a look at them.
+
+```{r check_pairs}
+df_dis <- df_pair %>% 
+  filter(agree == "disagree") %>% 
+  select(pair_unsrt) %>% 
+  left_join(df_inter, by = join_by(pair_unsrt)) %>% 
+  mutate(pair = fct_inorder(pair))
+
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(
+  floor_dec(min(df_dis$n_dist), level = -(nchar(paste(min(df_dis$n_dist))) - 1)),
+  ceiling_dec(max(df_dis$n_dist), level = -(nchar(paste(max(df_dis$n_dist))) - 1))
+)
+
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+
+
+ggplot(df_dis) +
+  #geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(aes(x = log_n_dist, y = log_test_stat, colour = pair)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis", colour = "Pair", fill = "Pair", shape = "Pair")
+```
+
+## Analyse Kuiper statistic
+
+::: callout-important
+TODO: deal with pairs. Take the mean of test stats?
+:::
+
+Plot test stat VS number of computed distances in a log-transformed space.
 
 ```{r plot}
 #| fig-column: body-outset
@@ -79,19 +157,24 @@ rib_data <- tibble(n_dist = lim_dist) %>%
   mutate(order = c(1, 2, 4, 3)) %>% 
   arrange(order)
 
-# Detect points above the polygon
+
+
+# Reorder pairs
 df_inter <- df_inter %>% 
-  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
+  arrange(pair_unsrt) %>% 
+  mutate(pair_unsrt = fct_inorder(pair_unsrt))
 
 ## Plot results
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = df_inter %>% filter(above), aes(x = log_n_dist, y = log_test_stat,  fill = pair, colour = pair, shape = pair)) +
+  geom_point(data = df_inter %>% filter(above), aes(x = log_n_dist, y = log_test_stat,  colour = pair_unsrt, shape = pair_unsrt)) +
   geom_point(data = df_inter %>% filter(!above), aes(x = log_n_dist, y = log_test_stat), colour = "grey") +
   #scale_fill_paletteer_d(`"khroma::discreterainbow"`) +
   #scale_colour_paletteer_d(`"khroma::discreterainbow"`) +
-  scale_shape_manual(values = rep(21:25, 6)) +
+  scale_fill_paletteer_d(`"pals::polychrome"`) +
+  scale_colour_paletteer_d(`"pals::polychrome"`) +
+  scale_shape_manual(values = rep(21:25, 30)) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistis", colour = "Pair", fill = "Pair", shape = "Pair")  +
@@ -105,13 +188,13 @@ Plot distributions of those above the polygon.
 #| out-width: 100%
 #| fig-width: 8
 #| fig-height: 6
-df_inter_dist %>% 
-  left_join(df_inter, by = join_by(pair)) %>% 
-  filter(above) %>% 
-  pivot_longer(dist:dist_rand) %>% 
-  ggplot() + 
-  geom_density(aes(x = value, colour = name)) +
-  facet_wrap(~pair)
+#df_inter_dist %>% 
+#  left_join(df_inter, by = join_by(pair)) %>% 
+#  filter(above) %>% 
+#  pivot_longer(dist:dist_rand) %>% 
+#  ggplot() + 
+#  geom_density(aes(x = value, colour = name)) +
+#  facet_wrap(~pair)
 ```
 
 Plot ECDF of those above the polygon.
@@ -121,11 +204,11 @@ Plot ECDF of those above the polygon.
 #| out-width: 100%
 #| fig-width: 8
 #| fig-height: 6
-df_inter_dist %>% 
-  left_join(df_inter, by = join_by(pair)) %>% 
-  filter(above) %>% 
-  pivot_longer(dist:dist_rand) %>% 
-  ggplot() + 
-  stat_ecdf(aes(x = value, colour = name)) +
-  facet_wrap(~pair)
+#df_inter_dist %>% 
+#  left_join(df_inter, by = join_by(pair)) %>% 
+#  filter(above) %>% 
+#  pivot_longer(dist:dist_rand) %>% 
+#  ggplot() + 
+#  stat_ecdf(aes(x = value, colour = name)) +
+#  facet_wrap(~pair)
 ```
