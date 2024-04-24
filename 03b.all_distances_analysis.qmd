@@ -78,8 +78,10 @@ df_all %>%
   unnest(c(dist, dist_rand)) %>% 
   pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
+  mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
-  geom_density(aes(x = dist, colour = type))
+  geom_density(aes(x = dist, colour = type)) +
+  labs(x = "Distance (cm)")
 ```
 
 Plot ECDF.
@@ -90,8 +92,10 @@ df_all %>%
   unnest(c(dist, dist_rand)) %>% 
   pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
+  mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
-  stat_ecdf(aes(x = dist, colour = type))
+  stat_ecdf(aes(x = dist, colour = type)) +
+  labs(x = "Distance (cm)")
 ```
 
 ::: {.callout-note icon="false"}

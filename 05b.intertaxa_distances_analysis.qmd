@@ -192,8 +192,10 @@ Plot distributions of those above the polygon.
 #  left_join(df_inter, by = join_by(pair)) %>% 
 #  filter(above) %>% 
 #  pivot_longer(dist:dist_rand) %>% 
+#  mutate(value = value * 51 / 10000) %>% # from pixel to cm
 #  ggplot() + 
 #  geom_density(aes(x = value, colour = name)) +
+#  labs(x = "Distance (cm)") +
 #  facet_wrap(~pair)
 ```
 
@@ -208,7 +210,9 @@ Plot ECDF of those above the polygon.
 #  left_join(df_inter, by = join_by(pair)) %>% 
 #  filter(above) %>% 
 #  pivot_longer(dist:dist_rand) %>% 
+#  mutate(value = value * 51 / 10000) %>% # from pixel to cm
 #  ggplot() + 
 #  stat_ecdf(aes(x = value, colour = name)) +
+#  labs(x = "Distance (cm)") +
 #  facet_wrap(~pair)
 ```

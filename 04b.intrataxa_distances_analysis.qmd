@@ -114,8 +114,10 @@ Let’s plot their distances.
 df_intra_dist %>% 
   filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
   pivot_longer(dist:dist_rand) %>% 
+  mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() +
   geom_density(aes(x = value, colour = name)) +
+  labs(x = "Distance (cm)") +
   facet_wrap(~taxon, scales = "free")
 ```
 
@@ -129,8 +131,10 @@ And plot their ECDF.
 df_intra_dist %>% 
   filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
   pivot_longer(dist:dist_rand) %>% 
+  mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() +
   stat_ecdf(aes(x = value, colour = name)) +
+  labs(x = "Distance (cm)") +
   facet_wrap(~taxon, scales = "free")
 ```
 
