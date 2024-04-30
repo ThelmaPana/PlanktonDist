@@ -32,8 +32,7 @@ res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
 df_intra <- res[1,] %>% 
   bind_rows() %>% 
   select(t1 = taxon, t2 = taxon, everything())
-
-
+  
 ## Inter distances
 # list processed files
 processed <- list.files("data", pattern = "05.", full.names = TRUE)
@@ -43,10 +42,24 @@ res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
 
 # get summary data (1st line)
 df_inter <- res[1,] %>% bind_rows() %>% 
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"))
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) 
 
-## Bind together
-df_all <- bind_rows(df_intra, df_inter)
+# List taxonomic groups
+taxa <- unique(df_inter$t1)
+
+# Average within pairs for inter
+df_inter <- df_inter %>% 
+  mutate(pair = ifelse(t1 < t2, paste0(t1, " - ", t2), paste0(t2, " - ", t1)), .before = t1) %>% 
+  group_by(pair) %>% 
+  summarise_if(is.numeric, mean) %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"), cols_remove = FALSE)
+# and generate reverse of t1 / t2
+df_inter_bis <- df_inter %>% rename(t2 = t1, t1 = t2)
+
+## Bind together intra and inter
+df_all <- df_intra %>% 
+  bind_rows(df_inter) %>% 
+  bind_rows(df_inter_bis)
 
 ## Null distances
 load("data/02a.f_val_dist.Rdata")
@@ -71,18 +84,29 @@ df_all <- df_all %>% filter(!(str_detect(t1, "Collodaria_colonial") | str_detect
 # Detect points above the polygon
 df_all <- df_all %>% 
   mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
+
+# Compute z-scores
+df_all <- df_all %>% 
+    mutate(
+    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymean = rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == "mean") %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
+    # compute sigma
+    sigma = (ymax - ymin) / (2 * 1.645),
+    # compute z-score
+    z_score = (log_test_stat - ymean)/sigma
+  )
 ```
 
 ```{r mat}
-df_mat <- df_intra %>% 
-  select(t1, t2) %>% 
-  expand(t1, t2) %>% 
-  left_join(df_all %>% filter(above) %>% select(t1, t2, strength = test_stat), by = join_by(t1, t2))
+df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
+  left_join(df_all %>% select(-pair) %>% filter(above), by = join_by(t1, t2))
 
 ggplot(df_mat) +
-  geom_raster(aes(x = t1, y = t2, fill = strength)) +
-  scale_fill_viridis_c(trans = "log1p", na.value = NA) +
-  labs(fill = "Interaction\nstrength") +
+  geom_raster(aes(x = t1, y = t2, fill = test_stat, alpha = z_score)) +
+  scale_fill_viridis_c(na.value = NA) +
+  labs(fill = "Kuiper\nstatistic", alpha = "Z-score") +
   theme_classic() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -99,6 +123,7 @@ mat <- df_intra %>%
   as.data.frame() %>% 
   column_to_rownames("t1") %>% 
   data.matrix()
+
 
 image(mat)
 ```
