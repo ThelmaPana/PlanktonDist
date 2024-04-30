@@ -54,6 +54,12 @@ First, we need to generate a null dataset that is representative of the true dat
 # Number of objects per image
 counts <- plankton %>% count(img_name)
 ggplot(counts) + geom_histogram(aes(x = n), bins = 100)
+
+ggplot(counts) + 
+  geom_histogram(aes(x = n), bins = 100) +
+  scale_x_continuous(expand = c(0,0)) + 
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = "N obj", y = "Count")
 ```
 
 Let’s generate `r n_img` images with a similar distribution of number of objects per image.
@@ -199,23 +205,38 @@ f_val_dist <- f_val_dist %>%
   )
 
 # Perform quantile regression on 0.05 and 0.95 quantiles
-rqfit <- rq(log_test_stat ~ log_n_dist, data = f_val_dist, tau = c(0.05, 0.95))
+rq_fit <- rq(log_test_stat ~ log_n_dist, data = f_val_dist, tau = c(0.05, 0.95))
+# Perform linear regression -> mean
+lm_fit <- lm(log_test_stat ~ log_n_dist, data = f_val_dist)
 
 #  Extract coefficients
-rq_coef <- tidy(rqfit) %>% 
+rq_coef <- tidy(rq_fit) %>% 
   select(term, estimate, tau) %>% 
-  mutate(tau = as.factor(tau)) %>% 
+  mutate(tau = as.character(tau)) %>% 
   mutate(term = case_when(
     term == "(Intercept)" ~ "intercept",
     term == "log_n_dist" ~ "slope",
   )) %>% 
   pivot_wider(names_from = "term", values_from = estimate)
+lm_coef <- tidy(lm_fit) %>% 
+  select(term, estimate) %>% 
+    mutate(term = case_when(
+    term == "(Intercept)" ~ "intercept",
+    term == "log_n_dist" ~ "slope",
+  )) %>% 
+  pivot_wider(names_from = "term", values_from = estimate) %>% 
+  mutate(tau = "mean", .before = intercept)
+
+# Store all coef together
+rq_coef <- rq_coef %>% 
+  bind_rows(lm_coef) %>% 
+  mutate(tau = as.factor(tau))
 
 # Save quantile reg coefts
 save(rq_coef, file = "data/02b.rq_coef.Rdata")
 
 # Generate data to plot a ribbon between the regression lines
-lim_dist <- c(5e1, 5e9) # extend of the ribbon in x-axis
+lim_dist <- c(5e1, 2e9) # extend of the ribbon in x-axis
 rib_data <- tibble(n_dist = lim_dist) %>% 
   mutate(
     # apply log-transformation
@@ -234,7 +255,8 @@ rib_data <- tibble(n_dist = lim_dist) %>%
 ggplot(f_val_dist) +
   geom_boxplot(aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_abline(data = rq_coef, aes(slope = slope, intercept = intercept, group = tau), linetype = 2) +
+  geom_abline(data = rq_coef %>% filter(tau != "mean"), aes(slope = slope, intercept = intercept, group = tau), linetype = 3) +
+  #geom_abline(data = rq_coef %>% filter(tau == "mean"), aes(slope = slope, intercept = intercept, group = tau), linetype = 2) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force), expand = c(0, 0)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistic")

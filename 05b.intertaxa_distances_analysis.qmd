@@ -21,7 +21,7 @@ source("utils.R")
 ## Read saved distances
 
 ```{r load}
-## Intra distances
+## Inter distances
 # list processed files
 processed <- list.files("data", pattern = "05.", full.names = TRUE)
 
@@ -115,24 +115,67 @@ rib_data <- tibble(n_dist = lim_dist) %>%
 # Reorder pairs
 df_inter <- df_inter %>% 
   arrange(pair) %>% 
+  filter(n_dist > 100) %>% 
   mutate(pair = fct_inorder(pair))
+
+# Prepare colours and shapes
+df_inter_above <- df_inter %>% 
+  filter(above) %>% 
+  mutate(
+    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 27)),
+    shape = rep(21:25, 6)[1:27]
+  )
 
 ## Plot results
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = df_inter %>% filter(above), aes(x = log_n_dist, y = log_test_stat,  colour = pair, shape = pair)) +
+  geom_point(data = df_inter %>% filter(above), aes(x = log_n_dist, y = log_test_stat,  colour = pair, shape = pair, fill = pair)) +
   geom_point(data = df_inter %>% filter(!above), aes(x = log_n_dist, y = log_test_stat), colour = "grey") +
-  #scale_fill_paletteer_d(`"khroma::discreterainbow"`) +
-  #scale_colour_paletteer_d(`"khroma::discreterainbow"`) +
-  scale_fill_paletteer_d(`"pals::polychrome"`) +
-  scale_colour_paletteer_d(`"pals::polychrome"`) +
-  scale_shape_manual(values = rep(21:25, 30)) +
+  scale_fill_manual(values = df_inter_above$colour) +
+  scale_colour_manual(values = df_inter_above$colour) +
+  scale_shape_manual(values = df_inter_above$shape) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistis", colour = "Pair", fill = "Pair", shape = "Pair")  +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Pair", fill = "Pair", shape = "Pair") +
   theme(legend.position = "bottom", legend.direction ="vertical")
 ```
+
+Count organisms with non random distributions.
+
+```{r count_orga}
+df_inter %>% 
+  filter(above) %>% 
+  select(pair) %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) %>% 
+  pivot_longer(t1:t2, values_to = "taxon") %>% 
+  select(taxon) %>% 
+  count(taxon) %>% 
+  arrange(n) %>% 
+  mutate(taxon = fct_inorder(taxon)) %>% 
+  ggplot() +
+  geom_col(aes(x = taxon , y= n)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_flip() +
+  labs(x = "Taxon", y = "N non random")
+```
+
+Does potential interections only affect the same taxa as in intra-taxonomic distances?
+
+```{r inter_vs_intra}
+df_inter %>% 
+  filter(above) %>% 
+  select(pair) %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) %>% 
+  mutate(
+    t1_intra = ifelse(t1 %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other"), TRUE, FALSE),
+    t2_intra = ifelse(t2 %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other"), TRUE, FALSE),
+    other_taxon = t1_intra | t2_intra
+  ) %>% 
+  filter(!other_taxon)
+```
+
+There is one pair that does not involve the taxa detected is intra-taxonomic distances analysis.
 
 Plot distributions of those above the polygon.
 
@@ -147,9 +190,13 @@ df_inter_dist %>%
   pivot_longer(dist:dist_rand) %>% 
   mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
-  geom_density(aes(x = value, colour = name)) +
-  labs(x = "Distance (cm)") +
-  facet_wrap(~pair)
+  geom_density(aes(x = value, colour = name), linewidth = 0.3) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  facet_wrap(~pair, scales = "free")
 ```
 
 Plot ECDF of those above the polygon.
@@ -165,7 +212,81 @@ df_inter_dist %>%
   pivot_longer(dist:dist_rand) %>% 
   mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
-  stat_ecdf(aes(x = value, colour = name)) +
-  labs(x = "Distance (cm)") +
-  facet_wrap(~pair)
+  stat_ecdf(aes(x = value, colour = name), linewidth = 0.3) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  facet_wrap(~pair, scales = "free")
+```
+
+Plot 4 of them.
+
+```{r plot_subset}
+pair_to_plot <- df_inter %>% 
+  filter(above) %>% 
+  arrange(desc(n_dist)) %>% 
+  slice_head(n = 4) %>% 
+  pull(pair)
+
+df_inter_dist %>% 
+  left_join(df_inter, by = join_by(pair)) %>% 
+  filter(above) %>% 
+  filter(pair %in% pair_to_plot) %>% 
+  pivot_longer(dist:dist_rand) %>% 
+  mutate(value = value * 51 / 10000) %>% # from pixel to cm
+  ggplot() + 
+  geom_density(aes(x = value, colour = name), linewidth = 0.3) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  facet_wrap(~pair, scales = "free")
+```
+
+## Interaction strength & confidence
+
+```{r z_score}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 5
+df_inter_scores <- df_inter %>% 
+  mutate(
+    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymean = rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == "mean") %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
+    # compute sigma
+    sigma = (ymax - ymin) / (2 * 1.645),
+    # compute z-score
+    z_score = (log_test_stat - ymean)/sigma
+  )
+
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_scores %>% filter(above), aes(x = log_n_dist, y = log_test_stat, colour = z_score)) +
+  scale_colour_viridis_c() +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis", colour = "Z-score") 
+```
+
+Plot Z-score VS Kuiper statistic.
+
+```{r plot_z}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 9
+df_inter_scores %>% 
+  filter(above) %>% 
+  ggplot() + 
+  geom_point(aes(x = test_stat, y = z_score, colour = pair)) +
+  scale_colour_manual(values = df_inter_above$colour) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Pair") +
+  theme(legend.position = "bottom", legend.direction ="vertical")
 ```

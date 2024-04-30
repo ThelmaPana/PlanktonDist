@@ -80,8 +80,12 @@ df_all %>%
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
   mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
-  geom_density(aes(x = dist, colour = type)) +
-  labs(x = "Distance (cm)")
+  geom_density(aes(x = dist, colour = type), linewidth = 0.3) +
+  scale_colour_manual(
+    values = c("rand" = "grey20", "data" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type")
 ```
 
 Plot ECDF.
@@ -95,6 +99,10 @@ df_all %>%
   mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
   stat_ecdf(aes(x = dist, colour = type)) +
+  scale_colour_manual(
+    values = c("rand" = "grey20", "data" = "red"),
+    labels = c("plankton", "null")
+    ) +
   labs(x = "Distance (cm)")
 ```
 
@@ -103,3 +111,21 @@ df_all %>%
 
 **Distances between planktonic organisms at the local scale differ from the distances that could be expected if plankton was randomly distributed.**
 :::
+
+```{r}
+df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
+  ggplot() + 
+  geom_density(aes(x = dist), colour = "#58C98E") +
+  labs(x = "Distance (cm)", y = "Density")
+
+df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  mutate(dist_rand = dist_rand * 51 / 10000) %>% # from pixel to cm
+  ggplot() + 
+  geom_density(aes(x = dist_rand), colour = "#50B1F9") +
+  labs(x = "Distance (cm)", y = "Density")
+```

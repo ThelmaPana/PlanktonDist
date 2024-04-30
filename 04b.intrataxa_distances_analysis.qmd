@@ -51,6 +51,10 @@ df_intra <- df_intra %>%
     log_n_dist = log10(n_dist),
     log_test_stat = log10(test_stat)
   )
+
+# Detect points above the polygon
+df_intra <- df_intra %>% 
+  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
 ```
 
 ## Analyse Kuiper statistic
@@ -83,12 +87,33 @@ rib_data <- tibble(n_dist = lim_dist) %>%
 
 ## Plot results
 ggplot() +
-  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
   geom_point(data = df_intra, aes(x = log_n_dist, y = log_test_stat, fill = taxon, colour = taxon, shape = taxon)) +
   scale_fill_paletteer_d(`"khroma::discreterainbow"`) +
   scale_colour_paletteer_d(`"khroma::discreterainbow"`) +
   scale_shape_manual(values = rep(21:25, 6)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+
+## Plot results with points in polygon in grey
+# Keep same colour & shape as in previous plot
+df_intra_above <- df_intra %>% 
+  mutate(
+    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
+    shape = rep(21:25, 6)[1:28]
+  ) %>% 
+  filter(above)
+
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_intra %>% filter(above), aes(x = log_n_dist, y = log_test_stat, fill = taxon, colour = taxon, shape = taxon)) +
+  geom_point(data = df_intra %>% filter(!above), aes(x = log_n_dist, y = log_test_stat), colour = "gray") +
+  scale_fill_manual(values = df_intra_above$colour) +
+  scale_colour_manual(values = df_intra_above$colour) +
+  scale_shape_manual(values = df_intra_above$shape) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistis", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
@@ -116,8 +141,12 @@ df_intra_dist %>%
   pivot_longer(dist:dist_rand) %>% 
   mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() +
-  geom_density(aes(x = value, colour = name)) +
-  labs(x = "Distance (cm)") +
+  geom_density(aes(x = value, colour = name), linewidth = 0.3) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
   facet_wrap(~taxon, scales = "free")
 ```
 
@@ -134,8 +163,59 @@ df_intra_dist %>%
   mutate(value = value * 51 / 10000) %>% # from pixel to cm
   ggplot() +
   stat_ecdf(aes(x = value, colour = name)) +
-  labs(x = "Distance (cm)") +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
   facet_wrap(~taxon, scales = "free")
 ```
 
 For the 4  groups, distances distribution is shifted to the left compared to null distances: individuals are closer to each other than expected under a random distribution.
+
+## Interaction strength & confidence
+
+```{r z_scores}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 5
+
+df_intra_scores <- df_intra %>% 
+  mutate(
+    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymean = rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == "mean") %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
+    # compute sigma
+    sigma = (ymax - ymin) / (2 * 1.645),
+    # compute z-score
+    z_score = (log_test_stat - ymean)/sigma
+  )
+
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_intra_scores %>% filter(above), aes(x = log_n_dist, y = log_test_stat, colour = z_score)) +
+  scale_colour_viridis_c() +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Z-score") 
+```
+
+Plot Z-score VS Kuiper statistic.
+
+```{r plot_z}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 5
+df_intra_scores %>% 
+  filter(above) %>% 
+  #filter(!str_detect(taxon, "Collodaria_colonial")) %>% 
+  ggplot() + 
+  geom_point(aes(x = test_stat, y = z_score, colour = taxon)) +
+  scale_colour_manual(values = df_intra_above$colour) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Taxon") +
+  xlim(c(0, 0.05))
+```

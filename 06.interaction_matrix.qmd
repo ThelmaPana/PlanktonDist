@@ -1,0 +1,104 @@
+---
+title: "Build an interaction matrix."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+## Read saved distances
+
+```{r load}
+## Intra distances
+# list processed files
+processed <- list.files("data", pattern = "04.", full.names = TRUE)
+
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_intra <- res[1,] %>% 
+  bind_rows() %>% 
+  select(t1 = taxon, t2 = taxon, everything())
+
+
+## Inter distances
+# list processed files
+processed <- list.files("data", pattern = "05.", full.names = TRUE)
+
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_inter <- res[1,] %>% bind_rows() %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"))
+
+## Bind together
+df_all <- bind_rows(df_intra, df_inter)
+
+## Null distances
+load("data/02a.f_val_dist.Rdata")
+load("data/02b.rq_coef.Rdata")
+
+## Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+df_all <- df_all %>% 
+    mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+# Drop colonial collodaria, pb with segmentation
+df_all <- df_all %>% filter(!(str_detect(t1, "Collodaria_colonial") | str_detect(t2, "Collodaria_colonial")))
+
+# Detect points above the polygon
+df_all <- df_all %>% 
+  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
+```
+
+```{r mat}
+df_mat <- df_intra %>% 
+  select(t1, t2) %>% 
+  expand(t1, t2) %>% 
+  left_join(df_all %>% filter(above) %>% select(t1, t2, strength = test_stat), by = join_by(t1, t2))
+
+ggplot(df_mat) +
+  geom_raster(aes(x = t1, y = t2, fill = strength)) +
+  scale_fill_viridis_c(trans = "log1p", na.value = NA) +
+  labs(fill = "Interaction\nstrength") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+
+
+mat <- df_intra %>% 
+  select(t1, t2) %>% 
+  expand(t1, t2) %>% 
+  left_join(df_all %>% filter(above) %>% select(t1, t2, strength = test_stat), by = join_by(t1, t2)) %>% 
+  pivot_wider(names_from = t2, values_from = strength) %>% 
+  as.data.frame() %>% 
+  column_to_rownames("t1") %>% 
+  data.matrix()
+
+image(mat)
+```
