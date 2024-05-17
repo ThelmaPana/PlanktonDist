@@ -1,15 +1,15 @@
 #/usr/local/bin/R
 #--------------------------------------------------------------------------#
 # Project: PlanktonDist
-# Script purpose: Generate null VS null for Acantharea-like data
-# Date: 14/05/2024
+# Script purpose: Generate 3 big null datasets and compute distances.
+# Date: 17/05/2024
 # Author: Thelma Panaïotis
 #--------------------------------------------------------------------------#
 
-
-## Set-up and read data ----
-#--------------------------------------------------------------------------#
 source("utils.R")
+
+## Load data ----
+#--------------------------------------------------------------------------#
 set.seed(seed)
 
 message("Reading data")
@@ -31,33 +31,15 @@ if (sub_sample){
   plankton <- read_parquet("data/01.x_corrected_plankton_clean.parquet")
 }
 
-
-## Select images ----
-#--------------------------------------------------------------------------#
-message("Selecting images")
-
-## Keep only images with several Acantharea
-plankton <- plankton %>% 
-  filter(taxon == "Acantharea") %>% 
-  add_count(img_name, taxon) %>% 
-  filter(n > 1) %>% 
-  select(-n)
-
-# List retained images
-images <- images %>% filter(img_name %in% plankton$img_name)
-img_names <- sort(unique(images$img_name))
-
 # Count objects per image
 counts <- plankton %>% count(img_name)
 
-gc(verbose = FALSE)
 
-
-## Generate null data ----
+## Generate null datasets ----
 #--------------------------------------------------------------------------#
 message("Generating null data")
 n_img <- nrow(images) # Number of images to generate
-n_sets <- 5 # Number of datasets to generate
+n_sets <- 3 # Number of datasets to generate
 
 # Representative number of objets per images
 n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
@@ -81,21 +63,22 @@ rand_points <- lapply(1:n_sets, function(i_set) {
 })
 
 
+
 ## Compute distances and compare ----
 #--------------------------------------------------------------------------#
 message("Computing distances")
-dist_rand <- lapply(rand_points, compute_all_dist)
+dist_rand <- lapply(rand_points, compute_all_dist, n_cores = n_cores)
+
 
 message("Performing comparison of subsets")
 # Size of subsets
 dist_count <- dist_rand[[1]] %>% count(img_name) %>% mutate(n_cum = cumsum(n))
 
-
 # Pair of sets to compare
 set_pairs <- crossing(set_a = 1:n_sets, set_b = 1:n_sets) %>% filter(set_a < set_b)
 
 # Loop on pairs of sets and perform kuiper test on each subset
-f_val_acant_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
+big_f_val_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
   message(paste0("Processing pair ", i, " out of ", nrow(set_pairs)))
   
   # Get sets of interest
@@ -103,7 +86,7 @@ f_val_acant_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
   i_set_b <- set_pairs %>% slice(i) %>% pull(set_b)
   set_a <- dist_rand[[i_set_a]]
   set_b <- dist_rand[[i_set_b]]
-    
+  
   # Subsample to 10-000 quantiles if needed
   if (nrow(set_a) > 10000) {
     probs <- seq(0, 1, length.out = 10000)
@@ -114,27 +97,20 @@ f_val_acant_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
     dist_set_b <- set_b$dist
   }
     
-  # Perform kuiper test between sets
-  kt <- kuiper_test(dist_set_a, dist_set_b)
-  
-  # Return results
-  tibble(
-    n_dist = nrow(set_a),
-    test_stat = kt[1],
-    set_a = as.factor(i_set_a),
-    set_b = as.factor(i_set_b)
-  )
+    # Perform kuiper test between sets
+    kt <- kuiper_test(dist_set_a, dist_set_b)
+    
+    # Return results
+    tibble(
+      n_dist = nrow(set_a),
+      test_stat = kt[1],
+      set_a = as.factor(i_set_a),
+      set_b = as.factor(i_set_b)
+    )
 }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
   bind_rows()
 
-# Compute log10 of n_dist and test_stat
-f_val_acant_dist <- f_val_acant_dist %>% 
-  mutate(
-    log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
-  )
-  
 
 ## Save ----
 #--------------------------------------------------------------------------#
-save(f_val_acant_dist, file = "data/07.f_val_acant_dist.Rdata")
+save(big_f_val_dist, file = "data/08.big_f_val_dist.Rdata")
