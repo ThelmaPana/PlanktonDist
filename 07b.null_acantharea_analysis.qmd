@@ -1,0 +1,113 @@
+---
+title: "Analyze null Kuiper statistics for Acantharea."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+## Read saved distances
+
+List saved distances and ream them
+
+```{r load}
+## Intra distances
+# list processed files
+processed <- list.files("data", pattern = "04.", full.names = TRUE)
+
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_intra <- res[1,] %>% bind_rows()
+# get distances (2nd line)
+df_intra_dist <- res[2,] %>% bind_rows()
+
+## Null distances
+load("data/02a.f_val_dist.Rdata")
+load("data/02b.rq_coef.Rdata")
+load("data/07.f_val_acant_dist.Rdata")
+
+## Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+df_intra <- df_intra %>% 
+    mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+# Detect points above the polygon
+df_intra <- df_intra %>% 
+  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
+```
+
+## Distribution of null Acantharea Kuiper statistics
+
+```{r null_acant}
+# Plot results, just Acant
+ggplot() +
+  geom_boxplot(data = f_val_acant_dist, aes(x = log_n_dist, y = log_test_stat)) +
+  geom_point(data = df_intra %>% filter(taxon == "Acantharea"), aes(x = log_n_dist, y = log_test_stat), colour = "red") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic")
+```
+
+## Compare with overall null Kuiper statistics
+
+Plot test stat VS number of computed distances in a log-transformed space.
+
+```{r f_vs_n_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(
+  floor_dec(min(df_intra$n_dist), level = -(nchar(paste(min(df_intra$n_dist))) - 1)),
+  ceiling_dec(max(df_intra$n_dist), level = -(nchar(paste(max(df_intra$n_dist))) - 1))
+)
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+
+## Plot results
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_boxplot(data = f_val_acant_dist, aes(x = log_n_dist, y = log_test_stat)) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_intra %>% filter(taxon == "Acantharea"), aes(x = log_n_dist, y = log_test_stat), colour = "red") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistis") 
+
+```
+
+Black is null Acantharea, grey is the global null data.
