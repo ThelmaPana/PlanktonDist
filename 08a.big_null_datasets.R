@@ -62,55 +62,127 @@ rand_points <- lapply(1:n_sets, function(i_set) {
     bind_rows()
 })
 
+# Names of new images
+images <- rand_points[[1]] %>% count(img_name)
 
 
-## Compute distances and compare ----
+## Break into chunks ----
 #--------------------------------------------------------------------------#
-message("Computing distances")
-dist_rand <- lapply(rand_points, compute_all_dist, n_cores = n_cores)
+message("Generating chunks")
+
+# Break into n pieces of images to process 
+n_chunk <- 10 # number of chunks
+chunk_size <- ceiling(nrow(images) / n_chunk) # size of chunks
+# compute chunks
+images <- images %>% 
+  mutate(
+    chunk = as.character(floor((row_number() - 1) / chunk_size) + 1),
+    .before = img_name
+  )
+
+# propagate chunks to points
+rand_points <- lapply(rand_points, function(el) {
+  el %>% left_join(images %>% select(-n), by = join_by(img_name))
+}) 
 
 
-message("Performing comparison of subsets")
-# Size of subsets
-dist_count <- dist_rand[[1]] %>% count(img_name) %>% mutate(n_cum = cumsum(n))
 
+
+## Loop over datasets and compute distances ----
+#--------------------------------------------------------------------------#
+lapply(1:n_sets, function(i) {
+  message(paste("Processing dataset", i, "out of", n_sets))
+  # Get dataset of interest
+  el <- rand_points[[i]]
+  
+  # Split by chunk
+  el <- el %>% 
+    group_by(chunk) %>% 
+    group_split()
+  
+  # Loop over chunks and compute distances
+  dist_all_el <- lapply(1:n_chunk, function(j) {
+    message(paste("Processing chunk", j, "out of", n_chunk))
+    
+    # Get chunk data
+    df <- el[[j]]
+    # Compute distances
+    dist_all <- compute_all_dist(df, n_cores = n_cores)
+    # Sleep
+    Sys.sleep(30)
+    
+    
+    # Return results
+    return(dist_all)
+  }) %>% 
+    bind_rows() %>% 
+    mutate(set = as.character(i))
+  
+  # Save it 
+  filename <- paste0("data/08a.distances_set_", i,".Rdata")
+  write_parquet(dist_all_el, sink = filename)
+  
+  gc(verbose = FALSE)
+})
+
+
+## Read saved distances and compute quantiles ----
+#--------------------------------------------------------------------------#
+# List of saved files
+files <- list.files(path = "data", pattern = "08a.d", full.names = TRUE)
+# Number of distances, initially set to NULL
+n_dist <- NULL
+
+# Quantiles to compute
+probs <- seq(0, 1, length.out = 10000)
+
+# Read files and get quantiles
+df_quant <- lapply(files, function(file) {
+  message(paste("Processing", file))
+  
+  # Read file
+  df_dist <- read_parquet(file)
+  
+  # Number of distances, compute it only once
+  if(is.null(n_dist)) {n_dist <- nrow(df_dist)}
+  
+  # Compute quantiles
+  df_dist <- quantile(df_dist$dist, probs = probs, names = FALSE)
+  gc(verbose = FALSE) # Memory cleaning
+
+  # Return quantiles
+  df_dist
+  
+})
+
+
+## Compare quantiles ----
+#--------------------------------------------------------------------------#
 # Pair of sets to compare
 set_pairs <- crossing(set_a = 1:n_sets, set_b = 1:n_sets) %>% filter(set_a < set_b)
 
-# Loop on pairs of sets and perform kuiper test on each subset
-big_f_val_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
-  message(paste0("Processing pair ", i, " out of ", nrow(set_pairs)))
-  
+# Loop over pairs
+res <- lapply(1:nrow(set_pairs), function(i) {
   # Get sets of interest
   i_set_a <- set_pairs %>% slice(i) %>% pull(set_a)
   i_set_b <- set_pairs %>% slice(i) %>% pull(set_b)
-  set_a <- dist_rand[[i_set_a]]
-  set_b <- dist_rand[[i_set_b]]
+  dist_set_a <- df_quant[[i_set_a]]
+  dist_set_b <- df_quant[[i_set_b]]
   
-  # Subsample to 10-000 quantiles if needed
-  if (nrow(set_a) > 10000) {
-    probs <- seq(0, 1, length.out = 10000)
-    dist_set_a <- quantile(set_a$dist, probs = probs, names = FALSE)
-    dist_set_b <- quantile(set_b$dist, probs = probs, names = FALSE)
-  } else {
-    dist_set_a <- set_a$dist
-    dist_set_b <- set_b$dist
-  }
-    
-    # Perform kuiper test between sets
-    kt <- kuiper_test(dist_set_a, dist_set_b)
-    
-    # Return results
-    tibble(
-      n_dist = nrow(set_a),
-      test_stat = kt[1],
-      set_a = as.factor(i_set_a),
-      set_b = as.factor(i_set_b)
-    )
-}, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
-  bind_rows()
+  # Perform kuiper test between sets
+  kt <- kuiper_test(dist_set_a, dist_set_b)
+  
+  # Return results
+  tibble(
+    n_dist = n_dist,
+    test_stat = kt[1],
+    set_a = as.factor(i_set_a),
+    set_b = as.factor(i_set_b)
+  )
+}) %>% bind_rows()
 
 
-## Save ----
+## Save test results ----
 #--------------------------------------------------------------------------#
-save(big_f_val_dist, file = "data/08.big_f_val_dist.Rdata")
+save(res, file = "data/08a.big_null_data.Rdata")
+
