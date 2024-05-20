@@ -70,6 +70,8 @@ ggplot() +
   labs(x = "N distances", y = "Kuiper statistic")
 ```
 
+Black boxplot is null datasets, red is Acantharea data.
+
 ## Compare with overall null Kuiper statistics
 
 Plot test stat VS number of computed distances in a log-transformed space.
@@ -110,4 +112,4 @@ ggplot() +
 
 ```
 
-Black is null Acantharea, grey is the global null data.
+Black is null Acantharea, grey is the global null data, red is Acantharea data.
