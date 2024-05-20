@@ -184,5 +184,5 @@ res <- lapply(1:nrow(set_pairs), function(i) {
 
 ## Save test results ----
 #--------------------------------------------------------------------------#
-save(res, file = "data/08a.big_null_data.Rdata")
+save(res, file = "data/08.big_f_val_dist.Rdata")
 
