@@ -42,6 +42,12 @@ n_img <- 10000 # number of images to consider for subsampling
 n_dist <- 10000 # number of distances to retain for comparisons
 
 
+## Distance threshold ----
+#--------------------------------------------------------------------------#
+# Only consider distances smaller than this threshold
+dist_thr_cm <- 20 # in cm
+dist_thr_px <- (dist_thr_cm * 10000) / 51 # in px
+
 ## Image volume ----
 #--------------------------------------------------------------------------#
 # image volume in pixels
@@ -56,7 +62,7 @@ data_dir <- here("data")
 
 ## Parallel ----
 #--------------------------------------------------------------------------#
-n_cores <- 2
+n_cores <- 8
 
 ## Seed ----
 #--------------------------------------------------------------------------#
@@ -208,3 +214,5 @@ compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
   
   return(dist_all)
 }
+
+
