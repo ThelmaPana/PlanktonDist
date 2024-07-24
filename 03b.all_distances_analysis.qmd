@@ -74,7 +74,7 @@ Plot distribution
 
 ```{r dist}
 df_all %>% 
-  select(dist, dist_rand) %>% 
+  dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
   pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
@@ -92,7 +92,7 @@ Plot ECDF.
 
 ```{r ecdf}
 df_all %>% 
-  select(dist, dist_rand) %>% 
+  dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
   pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
   mutate(type = ifelse(type == "dist_rand", "rand", "data")) %>% 
@@ -114,7 +114,7 @@ df_all %>%
 
 ```{r}
 df_all %>% 
-  select(dist, dist_rand) %>% 
+  dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
   mutate(dist = dist * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
@@ -122,7 +122,7 @@ df_all %>%
   labs(x = "Distance (cm)", y = "Density")
 
 df_all %>% 
-  select(dist, dist_rand) %>% 
+  dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
   mutate(dist_rand = dist_rand * 51 / 10000) %>% # from pixel to cm
   ggplot() + 
