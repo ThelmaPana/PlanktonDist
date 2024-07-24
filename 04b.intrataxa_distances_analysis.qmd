@@ -25,7 +25,7 @@ List saved distances and ream them
 ```{r load}
 ## Intra distances
 # list processed files
-processed <- list.files("data", pattern = "04.", full.names = TRUE)
+processed <- list.files("data", pattern = "04\\.", full.names = TRUE)
 
 # load data
 res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
@@ -95,7 +95,7 @@ ggplot() +
   scale_shape_manual(values = rep(21:25, 6)) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistis", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
 
 ## Plot results with points in polygon in grey
 # Keep same colour & shape as in previous plot
@@ -116,7 +116,7 @@ ggplot() +
   scale_shape_manual(values = df_intra_above$shape) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistis", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
 ```
 
 Four groups seem to have distances that differ from expected under a random distribution:
@@ -171,7 +171,7 @@ df_intra_dist %>%
   facet_wrap(~taxon, scales = "free")
 ```
 
-For the 4  groups, distances distribution is shifted to the left compared to null distances: individuals are closer to each other than expected under a random distribution.
+For the 4 groups, distances distribution is shifted to the left compared to null distances: individuals are closer to each other than expected under a random distribution.
 
 ## Interaction strength & confidence
 
@@ -214,8 +214,20 @@ df_intra_scores %>%
   filter(above) %>% 
   #filter(!str_detect(taxon, "Collodaria_colonial")) %>% 
   ggplot() + 
-  geom_point(aes(x = test_stat, y = z_score, colour = taxon)) +
+  geom_point(aes(x = test_stat, y = z_score, colour = taxon, fill = taxon, shape = taxon)) +
   scale_colour_manual(values = df_intra_above$colour) +
-  labs(x = "Kuiper statistic", y = "Z-score", colour = "Taxon") +
+  scale_fill_manual(values = df_intra_above$colour) +
+  scale_shape_manual(values = df_intra_above$shape) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Taxon", fill = "Taxon", shape = "Taxon") +
+  expand_limits(x = 0, y = 0) +
   xlim(c(0, 0.05))
+
+```
+
+## Save
+
+Save Z-score and Kuiper stat.
+
+```{r save}
+save(df_intra_scores, file = "data/04b.df_intra_scores.Rdata")
 ```

@@ -23,7 +23,7 @@ source("utils.R")
 ```{r load}
 ## Inter distances
 # list processed files
-processed <- list.files("data", pattern = "05.", full.names = TRUE)
+processed <- list.files("data", pattern = "05\\.", full.names = TRUE)
 
 # load data
 res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
@@ -285,8 +285,19 @@ Plot Z-score VS Kuiper statistic.
 df_inter_scores %>% 
   filter(above) %>% 
   ggplot() + 
-  geom_point(aes(x = test_stat, y = z_score, colour = pair)) +
+  geom_point(aes(x = test_stat, y = z_score, colour = pair, fill = pair, shape = pair)) +
   scale_colour_manual(values = df_inter_above$colour) +
-  labs(x = "Kuiper statistic", y = "Z-score", colour = "Pair") +
-  theme(legend.position = "bottom", legend.direction ="vertical")
+  scale_fill_manual(values = df_inter_above$colour) +
+  scale_shape_manual(values = df_inter_above$shape) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Pair", fill = "Pair", shape = "Pair") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  expand_limits(x = 0, y = 0)
+```
+
+## Save
+
+Save Z-score and Kuiper stat.
+
+```{r save}
+save(df_inter_scores, file = "data/05b.df_inter_scores.Rdata")
 ```
