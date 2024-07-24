@@ -1,0 +1,272 @@
+---
+title: "Analyze intertaxonomic distances, using small distances only."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+## Load data
+
+```{r read}
+#| cache.lazy: false
+load("data/02a.f_val_dist_small.Rdata")
+load("data/02b.rq_coef_small.Rdata")
+
+## Inter distances
+# list processed files
+processed <- list.files("data", pattern = "05\\.", full.names = TRUE)
+
+# load data
+res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
+
+# get summary data (1st line)
+df_inter <- res[1,] %>% bind_rows()
+# get distances (2nd line)
+df_inter_dist <- res[2,] %>% bind_rows()
+
+### Assign colour and shape to each taxon
+#df_inter <- df_inter %>% 
+#  mutate(
+#    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
+#    shape = rep(21:25, 6)[1:28]
+#  )
+```
+
+## Process data
+
+### Null distances
+
+```{r prep_null}
+# Apply log transformation for plotting
+f_val_dist <- f_val_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_test_stat = log10(test_stat)
+  )
+
+## Generate data to plot a ribbon between the regression lines
+# limits for n_dist
+lim_dist <- c(50, 2e9)
+# Generate ribbon
+rib_data <- tibble(n_dist = lim_dist) %>% 
+  mutate(
+    # apply log-transformation
+    log_n_dist = log10(n_dist),
+    # compute estimated kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+  ) %>% 
+  # reformat and reorder to plot a polygon
+  pivot_longer(ymin:ymax, values_to = "y") %>% 
+  mutate(order = c(1, 2, 4, 3)) %>% 
+  arrange(order)
+```
+
+### Plankton distances
+
+We need to filter distances to keep only the small distances, and perform the Kuiper test using these filtered distances.
+
+```{r filter_dist}
+# Keep only small distances
+df_inter_dist_small <- df_inter_dist %>% 
+  pivot_longer(dist:dist_rand) %>% 
+  mutate(value = value * 51 / 10000) %>% # from pixel to cm
+  filter(value < dist_thr_cm)
+
+# Perform Kuiper test using only small distances
+df_inter_small <- mclapply(df_inter$pair, function (ta) {
+  # Get distances
+  d1 <- df_inter_dist_small %>% filter(pair == ta) %>% filter(name == "dist") %>% pull(value) # plankton
+  d2 <- df_inter_dist_small %>% filter(pair == ta) %>% filter(name == "dist_rand") %>% pull(value) # null
+  
+  # Number of distances
+  n_dist_small <- (length(d1) + length(d2)) / 2
+  
+  # Kuiper test
+  kt <- kuiper_test(d1, d2)
+  
+  # Return results
+  return(
+    tibble(
+    pair = ta,
+    prop_dist_small = n_dist_small / 10000, # proportion of small distances based on the quantiles
+    test_stat = kt[1],
+    p_value = kt[2]
+  ))
+  
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+
+# compute number of small distances based on proportion of small distances and the total number of distances
+df_inter_small <- df_inter %>% 
+  select(pair, n_dist) %>% 
+  left_join(df_inter_small, by = join_by(pair)) %>% 
+  mutate(
+    n_dist_small = n_dist * prop_dist_small,
+    log_n_dist_small = log10(n_dist),
+    log_test_stat = log10((test_stat))
+  )
+
+# Detect taxa which are above the ribbon and have enough distances
+df_inter_small <- df_inter_small %>% 
+  mutate(
+    above = log_test_stat > log_n_dist_small * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)), # above the ribbon
+    keep = n_dist_small > n_dist_min, # enough distances
+    above = above & keep # combination of both
+    )
+# Assign colour and shape to these
+df_inter_small_above <- df_inter_small %>% 
+  filter(above)
+  #mutate( # too many points to assign colour and shape
+  #  colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
+  #  shape = rep(21:25, 6)[1:28]
+  #)
+```
+
+## Results
+
+### Kuiper statistic VS number of distances
+
+Plot Kuiper statistic VS number of distances.
+
+```{r kuiper_plot}
+#| fig-column: body-outset
+#| out-width: 100%
+# With all taxa
+ggplot() + 
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_small, aes(x = log_n_dist_small, y = log_test_stat), alpha = 0.5, size = 0.5) +
+  #scale_fill_manual(values = df_inter_small$colour) +
+  #scale_colour_manual(values = df_inter_small$colour) +
+  #scale_shape_manual(values = df_inter_small$shape) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+
+# With only taxa above ribbon
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat), alpha = 0.5, size = 0.5) +
+  geom_point(data = df_inter_small %>% filter(!above), aes(x = log_n_dist_small, y = log_test_stat), colour = "gray", size = 0.5) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+```
+
+### Distribution of distances
+
+Plot distribution of distances.
+
+```{r dist}
+#| fig-column: body-outset
+#| out-width: 100%
+# Plot density for 20 random pairs
+pairs_to_plot <- sample(df_inter_small_above$pair, size = 20)
+df_inter_dist_small %>% 
+  filter(pair %in% pairs_to_plot) %>% 
+  #filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
+  ggplot() +
+  geom_density(aes(x = value, colour = name)) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  facet_wrap(~pair, scales = "free")
+```
+
+Plot ECDF.
+
+```{r ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+# Plot ECDF
+df_inter_dist_small %>% 
+  filter(pair %in% pairs_to_plot) %>% 
+  ggplot() +
+  stat_ecdf(aes(x = value, colour = name)) +
+  scale_colour_manual(
+    values = c("dist_rand" = "grey20", "dist" = "red"),
+    labels = c("plankton", "null")
+    ) +
+  facet_wrap(~pair, scales = "free")
+```
+
+### Interaction strength & confidence
+
+```{r z_scores}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 5
+
+df_inter_scores <- df_inter_small %>% 
+  mutate(
+    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
+    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist_small + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymean = rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist_small + rq_coef %>% filter(tau == "mean") %>% pull(intercept),
+    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist_small + rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
+    # compute sigma
+    sigma = (ymax - ymin) / (2 * 1.645),
+    # compute z-score
+    z_score = (log_test_stat - ymean)/sigma
+  )
+
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_scores %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = z_score)) +
+  scale_colour_viridis_c() +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Z-score") 
+```
+
+Plot Z-score VS Kuiper statistic.
+
+```{r plot_z}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 8
+#| fig-height: 5
+df_inter_scores %>% 
+  filter(above) %>% 
+  ggplot() + 
+  geom_point(aes(x = test_stat, y = z_score)) +
+  #scale_colour_manual(values = df_inter_small_above$colour) +
+  #scale_fill_manual(values = df_inter_small_above$colour) +
+  #scale_shape_manual(values = df_inter_small_above$shape) +
+  labs(x = "Kuiper statistic", y = "Z-score") +
+  expand_limits(x = 0, y = 0) +
+  xlim(c(0, 0.05))
+```
+
+::: {.callout-note icon="false"}
+## Conclusion
+
+**When focusing on small distances only, we detect more taxa for which the distribution of distances differs from those expected under a random distribution of organisms.**
+:::
+
+## Save
+
+Save Z-score and Kuiper stat.
+
+```{r save}
+save(df_inter_scores, file = "data/05c.df_inter_scores_small.Rdata")
+```
