@@ -1,5 +1,5 @@
 ---
-title: "Build an interaction matrix."
+title: "Build an interaction matrix from Kuiper statistic values."
 author: "Thelma Panaïotis"
 format: 
   html:
@@ -18,88 +18,70 @@ execute:
 source("utils.R")
 ```
 
-## Read saved distances
+## Read saved scores
+
+Read saved scores for both intra and inter distances and keep only relevant columns.
 
 ```{r load}
-## Intra distances
-# list processed files
-processed <- list.files("data", pattern = "04.", full.names = TRUE)
-
-# load data
-res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
-
-# get summary data (1st line)
-df_intra <- res[1,] %>% 
-  bind_rows() %>% 
-  select(t1 = taxon, t2 = taxon, everything())
-  
-## Inter distances
-# list processed files
-processed <- list.files("data", pattern = "05.", full.names = TRUE)
-
-# load data
-res <- sapply(processed, function(x) mget(load(x)), simplify = TRUE)
-
-# get summary data (1st line)
-df_inter <- res[1,] %>% bind_rows() %>% 
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) 
-
-# List taxonomic groups
-taxa <- unique(df_inter$t1)
-
-# Average within pairs for inter
-df_inter <- df_inter %>% 
-  mutate(pair = ifelse(t1 < t2, paste0(t1, " - ", t2), paste0(t2, " - ", t1)), .before = t1) %>% 
-  group_by(pair) %>% 
-  summarise_if(is.numeric, mean) %>% 
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"), cols_remove = FALSE)
-# and generate reverse of t1 / t2
-df_inter_bis <- df_inter %>% rename(t2 = t1, t1 = t2)
-
-## Bind together intra and inter
-df_all <- df_intra %>% 
-  bind_rows(df_inter) %>% 
-  bind_rows(df_inter_bis)
-
-## Null distances
-load("data/02a.f_val_dist.Rdata")
-load("data/02b.rq_coef.Rdata")
-
-## Apply log transformation for plotting
-f_val_dist <- f_val_dist %>% 
-  mutate(
-    log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
-  )
-
-df_all <- df_all %>% 
-    mutate(
-    log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
-  )
-
-# Drop colonial collodaria, pb with segmentation
-df_all <- df_all %>% filter(!(str_detect(t1, "Collodaria_colonial") | str_detect(t2, "Collodaria_colonial")))
-
-# Detect points above the polygon
-df_all <- df_all %>% 
-  mutate(above = log_test_stat > log_n_dist * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)))
-
-# Compute z-scores
-df_all <- df_all %>% 
-    mutate(
-    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
-    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
-    ymean = rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == "mean") %>% pull(intercept),
-    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
-    # compute sigma
-    sigma = (ymax - ymin) / (2 * 1.645),
-    # compute z-score
-    z_score = (log_test_stat - ymean)/sigma
-  )
+# Intra scores
+load("data/04c.df_intra_scores_small.Rdata")
+df_intra_scores <- df_intra_scores %>% 
+  select(t1 = taxon, t2 = taxon, test_stat, z_score, above)
+# Inter scores
+load("data/05c.df_inter_scores_small.Rdata")
+df_inter_scores <- df_inter_scores %>% 
+  select(pair, test_stat, z_score, above)
 ```
 
+Assemble intra and inter scores. But first we need to compute average of both pairs A-B and B-A.
+
+```{r assemble}
+# Average within pairs for inter
+df_inter_scores <- df_inter_scores %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) 
+
+# Average within pairs for inter
+df_inter_scores <- df_inter_scores %>% 
+  # make both A-B and B-A as A-B
+  mutate(pair = ifelse(
+    t1 < t2, 
+    paste0(t1, " - ", t2), 
+    paste0(t2, " - ", t1)
+  ), .before = t1) %>% 
+  # for each pair, compute average of test_stat, z_score and aboveness
+  group_by(pair) %>% 
+  summarise(
+    test_stat = mean(test_stat),
+    z_score = mean(z_score),
+    above = all(above) # both A-B and B-A should be above to consider the pair as above
+  ) %>% 
+  # regenerate taxa from pair
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"), cols_remove = FALSE)
+# and generate reverse of t1 / t2
+df_inter_scores_bis <- df_inter_scores %>% rename(t2 = t1, t1 = t2)
+
+## Bind together intra and inter
+df_all <- df_intra_scores %>% 
+  bind_rows(df_inter_scores) %>% 
+  bind_rows(df_inter_scores_bis)
+
+# Drop colonial collodaria that has a segmentation artifact
+df_all <- df_all %>% 
+  filter(
+    !(str_detect(t1, "Collodaria_colonial") | str_detect(t2, "Collodaria_colonial"))
+  )
+
+# List taxa
+taxa <- df_all %>% select(t1) %>% unique() %>% pull(t1)
+```
+
+## Build the matrix
+
 ```{r mat}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Create all combination of taxa and join scores
 df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
   left_join(df_all %>% select(-pair) %>% filter(above), by = join_by(t1, t2))
 
@@ -112,18 +94,7 @@ ggplot(df_mat) +
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
-  )
+  ) + 
+  coord_fixed()
 
-
-mat <- df_intra %>% 
-  select(t1, t2) %>% 
-  expand(t1, t2) %>% 
-  left_join(df_all %>% filter(above) %>% select(t1, t2, strength = test_stat), by = join_by(t1, t2)) %>% 
-  pivot_wider(names_from = t2, values_from = strength) %>% 
-  as.data.frame() %>% 
-  column_to_rownames("t1") %>% 
-  data.matrix()
-
-
-image(mat)
 ```
