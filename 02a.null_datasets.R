@@ -31,8 +31,8 @@ n_tar_dist <- c(1e2, 1e3, 1e4, 1e5, 1e6, 1e7)
 ## Generate null datasets ----
 #--------------------------------------------------------------------------#
 message("Generating null data")
-n_img <- 14000 # Number of images to generate
-n_sets <- 50 # Number of datasets to generate
+n_img <- 25000 # Number of images to generate
+n_sets <- 10 # Number of datasets to generate
 
 # Representative number of objets per images
 n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
@@ -62,6 +62,10 @@ rand_points <- lapply(1:n_sets, function(i_set) {
 message("Computing distances")
 dist_rand <- lapply(rand_points, compute_all_dist)
 
+# Keep only distances smaller than threshold
+dist_rand <- lapply(dist_rand, function(el) {
+  el %>% filter(dist < dist_thr_px)
+})
 
 message("Performing comparison of subsets")
 # Size of subsets
@@ -115,6 +119,7 @@ f_val_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
     
     # Return results
     tibble(
+      n_tar_dist = n_tar_dist[j],
       n_dist = nrow(tar_set_a),
       test_stat = kt[1],
       set_a = as.factor(i_set_a),
@@ -124,6 +129,19 @@ f_val_dist <- pbmclapply(1:nrow(set_pairs), function(i) {
     bind_rows()
 }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
   bind_rows()
+
+# Check that we have the correct number of distances
+ggplot(f_val_dist) + 
+  geom_point(aes(x = n_tar_dist, y = n_dist)) +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  scale_x_log10() +
+  scale_y_log10()
+
+# The number of distances varies across sets because of filtering on small distances
+# Replace it by the targeted number of distances
+f_val_dist <- f_val_dist %>% 
+  select(-n_dist) %>% 
+  rename(n_dist = n_tar_dist)
 
 
 ## Plot results ----
@@ -139,4 +157,9 @@ ggplot(f_val_dist) +
 
 ## Save results ----
 #--------------------------------------------------------------------------#
-save(f_val_dist, file = "data/02.f_val_dist.Rdata")
+# Kuiper statistic VS number of distances
+save(f_val_dist, file = "data/02a.f_val_dist_small.Rdata")
+
+# Save on set of distances
+dist_rand <- dist_rand[[1]]
+save(dist_rand, file = "data/02a.dist_rand_small.Rdata")
