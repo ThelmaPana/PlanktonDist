@@ -47,6 +47,8 @@ n_dist <- 10000 # number of distances to retain for comparisons
 # Only consider distances smaller than this threshold
 dist_thr_cm <- 20 # in cm
 dist_thr_px <- (dist_thr_cm * 10000) / 51 # in px
+n_dist_min <- 1000 # minimum number of distances to include a group/pair in analyses
+
 
 ## Image volume ----
 #--------------------------------------------------------------------------#
