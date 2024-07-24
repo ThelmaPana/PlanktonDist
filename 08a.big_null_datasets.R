@@ -129,7 +129,7 @@ lapply(1:n_sets, function(i) {
 ## Read saved distances and compute quantiles ----
 #--------------------------------------------------------------------------#
 # List of saved files
-files <- list.files(path = "data", pattern = "08a.d", full.names = TRUE)
+files <- list.files(path = "data", pattern = "08a.", full.names = TRUE)
 # Number of distances, initially set to NULL
 n_dist <- NULL
 
