@@ -24,9 +24,7 @@ source("utils.R")
 
 1.  See how the distribution of distances between random points look like. This null data is not used for comparison with true distances, representative null datasets are generated on the fly when computing plankton distances.
 
-2.  Check that two null datasets with the same number of images have the same distance distribution.
-
-3.  Assess the effect of the number of distances (& number of images) on the Kuiper test statistic.
+2.  Assess the effect of the number of distances on the Kuiper test statistic.
 :::
 
 ```{r read}
@@ -70,9 +68,12 @@ load("data/02a.dist_rand.Rdata")
 # Convert pix to cm
 dist_rand <- dist_rand %>% mutate(dist = dist * 51 / 10000)
 
+# Compute 10000-quantiles for the plot
+dist_rand_qt <- quantile(dist_rand$dist, probs = seq(0, 1, length.out = 10000), names = FALSE)
+
 # Plot it
-ggplot(dist_rand, aes(x = dist)) + geom_density()
-ggplot(dist_rand, aes(x = dist)) + stat_ecdf()
+ggplot() + geom_density(aes(x = dist_rand_qt)) + labs(x = "Distance (cm)")
+ggplot() + stat_ecdf(aes(x = dist_rand_qt)) + labs(x = "Distance (cm)")
 ```
 
 ## Effect of number of distances on Kuiper test statistic
