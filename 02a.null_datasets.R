@@ -31,8 +31,8 @@ n_tar_dist <- c(1e2, 1e3, 1e4, 1e5, 1e6, 1e7)
 ## Generate null datasets ----
 #--------------------------------------------------------------------------#
 message("Generating null data")
-n_img <- 25000 # Number of images to generate
-n_sets <- 10 # Number of datasets to generate
+n_img <- 55000 # Number of images to generate
+n_sets <- 1 # Number of datasets to generate
 
 # Representative number of objets per images
 n_pts <- counts %>% slice_sample(n = n_img, replace = TRUE) %>% pull(n)
@@ -56,7 +56,6 @@ rand_points <- lapply(1:n_sets, function(i_set) {
 })
 
 
-
 ## Compute distances and compare ----
 #--------------------------------------------------------------------------#
 message("Computing distances")
@@ -66,6 +65,9 @@ dist_rand <- lapply(rand_points, compute_all_dist)
 dist_rand <- lapply(dist_rand, function(el) {
   el %>% filter(dist < dist_thr_px)
 })
+
+el <- dist_rand[[1]]
+nrow(el) > n_tar_dist
 
 message("Performing comparison of subsets")
 # Size of subsets
