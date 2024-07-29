@@ -110,7 +110,7 @@ ggplot() +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
   #geom_point(data = df_all, aes(x = log_n_dist, y = log_test_stat), colour = "blue") +
   geom_point(aes(x = df_all$log_n_dist_small, y = log10(kt[1])), colour = "red") +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistic")
 
@@ -124,7 +124,7 @@ df_dist_small %>%
   ggplot() + 
   geom_density(aes(x = dist, colour = type)) +
   scale_colour_manual(
-    values = c("rand" = "grey20", "data" = "red"),
+    values = c("rand" = "grey60", "data" = "black"),
     labels = c("plankton", "null")
     ) +
   labs(x = "Distance (cm)", y = "Density", colour = "Type")
@@ -138,7 +138,7 @@ df_dist_small %>%
   ggplot() + 
   stat_ecdf(aes(x = dist, colour = type)) +
   scale_colour_manual(
-    values = c("rand" = "grey20", "data" = "red"),
+    values = c("rand" = "grey60", "data" = "black"),
     labels = c("plankton", "null")
     ) +
   labs(x = "Distance (cm)", y = "Density", colour = "Type")

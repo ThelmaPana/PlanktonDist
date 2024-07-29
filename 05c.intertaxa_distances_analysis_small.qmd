@@ -38,12 +38,9 @@ df_inter <- res[1,] %>% bind_rows()
 # get distances (2nd line)
 df_inter_dist <- res[2,] %>% bind_rows()
 
-### Assign colour and shape to each taxon
-#df_inter <- df_inter %>% 
-#  mutate(
-#    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
-#    shape = rep(21:25, 6)[1:28]
-#  )
+## Drop colonial Collodaria because of segmentation artifact
+df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
+df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
 ```
 
 ## Process data
@@ -116,10 +113,11 @@ df_inter_small <- df_inter %>%
   select(pair, n_dist) %>% 
   left_join(df_inter_small, by = join_by(pair)) %>% 
   mutate(
-    n_dist_small = n_dist * prop_dist_small,
-    log_n_dist_small = log10(n_dist),
-    log_test_stat = log10((test_stat))
-  )
+    n_dist_small = round(n_dist * prop_dist_small), # total number of small distances
+    log_n_dist_small = log10(n_dist_small), # log transform number of small distances
+    log_test_stat = log10(test_stat) # log transform test stat
+  ) %>% 
+  filter(n_dist_small > 100) # keep only pairs with at least 100 small distances
 
 # Detect taxa which are above the ribbon and have enough distances
 df_inter_small <- df_inter_small %>% 
@@ -127,14 +125,9 @@ df_inter_small <- df_inter_small %>%
     above = log_test_stat > log_n_dist_small * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)), # above the ribbon
     keep = n_dist_small > n_dist_min, # enough distances
     above = above & keep # combination of both
-    )
-# Assign colour and shape to these
-df_inter_small_above <- df_inter_small %>% 
-  filter(above)
-  #mutate( # too many points to assign colour and shape
-  #  colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
-  #  shape = rep(21:25, 6)[1:28]
-  #)
+    ) %>% 
+  select(-keep)
+df_inter_small_above <- df_inter_small %>% filter(above)
 ```
 
 ## Results
@@ -151,22 +144,20 @@ ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
   geom_point(data = df_inter_small, aes(x = log_n_dist_small, y = log_test_stat), alpha = 0.5, size = 0.5) +
-  #scale_fill_manual(values = df_inter_small$colour) +
-  #scale_colour_manual(values = df_inter_small$colour) +
-  #scale_shape_manual(values = df_inter_small$shape) +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Pair", fill = "Pair", shape = "Pair") 
 
 # With only taxa above ribbon
+# Highligh pairs with Acantharea
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = df_inter_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat), alpha = 0.5, size = 0.5) +
+  geom_point(data = df_inter_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = str_detect(pair, "Acantharea")), alpha = 0.5, size = 0.5) +
   geom_point(data = df_inter_small %>% filter(!above), aes(x = log_n_dist_small, y = log_test_stat), colour = "gray", size = 0.5) +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Acantharea") 
 ```
 
 ### Distribution of distances
@@ -180,15 +171,15 @@ Plot distribution of distances.
 pairs_to_plot <- sample(df_inter_small_above$pair, size = 20)
 df_inter_dist_small %>% 
   filter(pair %in% pairs_to_plot) %>% 
-  #filter(taxon %in% c("Acantharea", "Cop_small", "Cop_Calanoida", "Cop_other")) %>% 
   ggplot() +
-  geom_density(aes(x = value, colour = name)) +
+  geom_density(aes(x = value, colour = name), linewidth = 0.3) +
   scale_colour_manual(
-    values = c("dist_rand" = "grey20", "dist" = "red"),
+    values = c("dist_rand" = "grey60", "dist" = "black"),
     labels = c("plankton", "null")
     ) +
   labs(x = "Distance (cm)", y = "Density", colour = "Type") +
-  facet_wrap(~pair, scales = "free")
+  facet_wrap(~pair, scales = "free") +
+  theme(strip.text = element_text(size = 6))
 ```
 
 Plot ECDF.
@@ -200,12 +191,115 @@ Plot ECDF.
 df_inter_dist_small %>% 
   filter(pair %in% pairs_to_plot) %>% 
   ggplot() +
-  stat_ecdf(aes(x = value, colour = name)) +
+  stat_ecdf(aes(x = value, colour = name), linewidth = 0.3) +
   scale_colour_manual(
-    values = c("dist_rand" = "grey20", "dist" = "red"),
+    values = c("dist_rand" = "grey60", "dist" = "black"),
     labels = c("plankton", "null")
     ) +
-  facet_wrap(~pair, scales = "free")
+  facet_wrap(~pair, scales = "free") +
+  theme(strip.text = element_text(size = 6))
+```
+
+### Direction of interaction
+
+```{r check_dir}
+#| fig-column: body-outset
+#| out-width: 100%
+# Reshape df to have one row per pair
+df_wide <- df_inter_dist_small %>% 
+  filter(pair %in% df_inter_small_above$pair) %>% 
+  pivot_wider(names_from = "name", values_from = "value", values_fn = list)
+
+# Loop over taxa
+ecdfs <- lapply(1:nrow(df_wide), function(i) {
+  # Get row
+  r <- df_wide %>% slice(i)  
+  
+  # Compute ecdf
+  # Needs a nested call: ecdf(x) returns a function, x being the values of interest
+  # Call this function with argument x2 to get values along x2 (here, plankton distances so that we have a common x axis) 
+  plank_ecdf <- ecdf(unlist(r$dist))(unlist(r$dist))
+  null_ecdf <- ecdf(unlist(r$dist_rand))(unlist(r$dist))
+  
+  # Return difference
+  res <- tibble(
+    plank_dist = sort(unlist(r$dist)),
+    plank_ecdf = plank_ecdf,
+    null_ecdf = null_ecdf,
+    diff = plank_ecdf - null_ecdf
+    ) %>% 
+    mutate(pair = r$pair) %>% # add pair
+    select(pair, everything())
+  return(res)
+}) %>% 
+  bind_rows()
+
+# Plot the result for a few pairs
+ecdfs %>% 
+  filter(pair %in% pairs_to_plot) %>%
+  ggplot() + 
+  geom_hline(yintercept = 0, colour = "gray60", linewidth = 0.3) +
+  geom_path(aes(x = plank_dist, y = diff), linewidth = 0.3) +
+  facet_wrap(~pair, scales = "free") +
+  labs(x = "Distance (cm)", y = "Plankton ECDF - Null ECDF") +
+  theme(strip.text = element_text(size = 6))
+
+# To get a summary, we can sum the differences for each pair.
+ecdfs_dir <- ecdfs %>% 
+  group_by(pair) %>% 
+  summarise(diff = sum(diff)) %>% # sum differences between ECDFs
+  mutate(dir = ifelse(sign(diff) == 1, "closer", "further")) %>% # flag the direction of the interaction
+  left_join(df_inter_small %>% select(pair, n_dist_small), by = join_by(pair)) %>% 
+  # drop Collodaria_colonial
+  filter(!str_detect(pair, "Collodaria_colonial")) %>% 
+  arrange(diff) %>% 
+  mutate(pair = fct_inorder(pair))
+
+# Store this with pairs information
+df_inter_small <- df_inter_small %>% left_join(ecdfs_dir, by = join_by(pair, n_dist_small))
+
+# Plot the distribution of differences
+ggplot(ecdfs_dir) + geom_density(aes(x = diff))
+# Most differences are positive, i.e. distances are shorter than expected under a random distribution of organisms
+
+# Look at the relationship between the difference in ECDFs and the number of distances
+ggplot(ecdfs_dir) + 
+  geom_point(aes(x = n_dist_small, y = diff, colour = dir), size = 0.5) +
+  scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
+  scale_x_continuous(trans = "log10") +
+  labs(x = "Number of distances", y = "Sum of differences between plankton ECDF and null ECDF", colour = "Direction")
+
+# Plot for a few pairs
+ecdfs_dir %>% 
+  filter(pair %in% pairs_to_plot) %>% 
+  ggplot() +
+  geom_col(aes(y = pair, x = diff, fill = dir)) +
+  scale_fill_manual(values = c("#67a9cf", "#ef8a62")) +
+  labs(x = "Sum of differences between plankton ECDF and null ECDF", y = "pair", fill = "Direction")
+
+# Kuiper statistic VS number of distances, with interaction direction
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = dir), size = 0.5) +
+  scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Direction") 
+```
+
+Let’s plot a few more specific examples, taking the more negative differences (i.e. longer distances).
+
+```{r plot_longer}
+ecdfs %>% 
+  filter(pair %in% ecdfs_dir$pair[1:4]) %>%
+  add_count(pair) %>% 
+  mutate(lab_pair = paste0(pair, " (n = ", n, ")")) %>% 
+  ggplot() + 
+  geom_hline(yintercept = 0, colour = "gray60", linewidth = 0.3) +
+  geom_path(aes(x = plank_dist, y = diff), linewidth = 0.3) +
+  facet_wrap(~lab_pair, scales = "free") +
+  labs(x = "Distance (cm)", y = "Plankton ECDF - Null ECDF")
 ```
 
 ### Interaction strength & confidence
@@ -231,9 +325,9 @@ df_inter_scores <- df_inter_small %>%
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = df_inter_scores %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = z_score)) +
+  geom_point(data = df_inter_scores %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = z_score), size = 0.5) +
   scale_colour_viridis_c() +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistic", colour = "Z-score") 
 ```
@@ -245,14 +339,10 @@ Plot Z-score VS Kuiper statistic.
 #| out-width: 100%
 #| fig-width: 8
 #| fig-height: 5
-df_inter_scores %>% 
-  filter(above) %>% 
-  ggplot() + 
-  geom_point(aes(x = test_stat, y = z_score)) +
-  #scale_colour_manual(values = df_inter_small_above$colour) +
-  #scale_fill_manual(values = df_inter_small_above$colour) +
-  #scale_shape_manual(values = df_inter_small_above$shape) +
-  labs(x = "Kuiper statistic", y = "Z-score") +
+ggplot(df_inter_scores) + 
+  geom_point(aes(x = test_stat, y = z_score, colour = dir), size = 0.5) +
+  scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Direction") +
   expand_limits(x = 0, y = 0) +
   xlim(c(0, 0.05))
 ```

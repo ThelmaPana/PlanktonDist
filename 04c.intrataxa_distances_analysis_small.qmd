@@ -38,11 +38,15 @@ df_intra <- res[1,] %>% bind_rows()
 # get distances (2nd line)
 df_intra_dist <- res[2,] %>% bind_rows()
 
+## Drop colonial Collodaria because of segmentation artifact
+df_intra <- df_intra %>% filter(!str_detect(taxon, "Collodaria_colonial"))
+df_intra_dist <- df_intra_dist %>% filter(!str_detect(taxon, "Collodaria_colonial"))
+
 ## Assign colour and shape to each taxon
 df_intra <- df_intra %>% 
   mutate(
-    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 28)),
-    shape = rep(21:25, 6)[1:28]
+    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = 27)),
+    shape = rep(21:25, 6)[1:27]
   )
 ```
 
@@ -116,10 +120,11 @@ df_intra_small <- df_intra %>%
   select(taxon, n_dist, colour, shape) %>% 
   left_join(df_intra_small, by = join_by(taxon)) %>% 
   mutate(
-    n_dist_small = n_dist * prop_dist_small,
-    log_n_dist_small = log10(n_dist),
-    log_test_stat = log10((test_stat))
-  )
+    n_dist_small = round(n_dist * prop_dist_small), # total number of small distances
+    log_n_dist_small = log10(n_dist_small), # log transform number of small distances
+    log_test_stat = log10(test_stat) # log transform test stat
+  ) %>% 
+  filter(n_dist_small > 100) # keep only taxons with at least 100 small distances
 
 # Detect taxa which are above the ribbon and have the minimum number of distances required
 df_intra_small <- df_intra_small %>% 
@@ -127,7 +132,8 @@ df_intra_small <- df_intra_small %>%
     above = log_test_stat > log_n_dist_small * (rq_coef %>% filter(tau == 0.95) %>% pull(slope)) + (rq_coef %>% filter(tau == 0.95) %>% pull(intercept)), # above the polygon
     keep = n_dist_small > n_dist_min, # enough distances
     above = above & keep # combination of both
-    )
+    ) %>% 
+  select(-keep)
 df_intra_small_above <- df_intra_small %>% filter(above) # needed to keep the same colour and shape across plots
 ```
 
@@ -148,7 +154,7 @@ ggplot() +
   scale_fill_manual(values = df_intra_small$colour) +
   scale_colour_manual(values = df_intra_small$colour) +
   scale_shape_manual(values = df_intra_small$shape) +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistic", colour = "Taxon", fill = "Taxon", shape = "Taxon") 
 
@@ -177,9 +183,9 @@ Plot distribution of distances.
 df_intra_dist_small %>% 
   filter(taxon %in% df_intra_small_above$taxon) %>% 
   ggplot() +
-  geom_density(aes(x = value, colour = name)) +
+  geom_density(aes(x = value, colour = name), linewidth = 0.3) +
   scale_colour_manual(
-    values = c("dist_rand" = "grey20", "dist" = "red"),
+    values = c("dist_rand" = "grey60", "dist" = "black"),
     labels = c("plankton", "null")
     ) +
   labs(x = "Distance (cm)", y = "Density", colour = "Type") +
@@ -195,13 +201,94 @@ Plot ECDF.
 df_intra_dist_small %>% 
   filter(taxon %in% df_intra_small_above$taxon) %>% 
   ggplot() +
-  stat_ecdf(aes(x = value, colour = name)) +
+  stat_ecdf(aes(x = value, colour = name), linewidth = 0.3) +
   scale_colour_manual(
-    values = c("dist_rand" = "grey20", "dist" = "red"),
+    values = c("dist_rand" = "grey60", "dist" = "black"),
     labels = c("plankton", "null")
     ) +
   facet_wrap(~taxon, scales = "free")
 ```
+
+### Direction of interaction
+
+```{r check_dir}
+#| fig-column: body-outset
+#| out-width: 100%
+# Reshape df to have one row per taxon
+df_wide <- df_intra_dist_small %>% 
+  filter(taxon %in% df_intra_small_above$taxon) %>% 
+  pivot_wider(names_from = "name", values_from = "value", values_fn = list)
+
+# Loop over taxa
+ecdfs <- lapply(1:nrow(df_wide), function(i) {
+  # Get row
+  r <- df_wide %>% slice(i)  
+  
+  # Compute ecdf
+  # Needs a nested call: ecdf(x) returns a function, x being the values of interest
+  # Call this function with argument x2 to get values along x2 (here, plankton distances so that we have a common x axis) 
+  plank_ecdf <- ecdf(unlist(r$dist))(unlist(r$dist))
+  null_ecdf <- ecdf(unlist(r$dist_rand))(unlist(r$dist))
+  
+  # Return difference
+  res <- tibble(
+    plank_dist = sort(unlist(r$dist)),
+    plank_ecdf = plank_ecdf,
+    null_ecdf = null_ecdf,
+    diff = plank_ecdf - null_ecdf
+    ) %>% 
+    mutate(taxon = r$taxon) %>% # add taxon
+    select(taxon, everything())
+  return(res)
+}) %>% 
+  bind_rows()
+
+# Plot the result
+ggplot(ecdfs) + 
+  geom_hline(yintercept = 0, colour = "gray60", linewidth = 0.3) +
+  geom_path(aes(x = plank_dist, y = diff), linewidth = 0.3) +
+  facet_wrap(~taxon, scales = "free") +
+  labs(x = "Distance (cm)", y = "Plankton ECDF - Null ECDF")
+
+# To get a summary, we can sum the differences for each taxon.
+ecdfs_dir <- ecdfs %>% 
+  group_by(taxon) %>% 
+  summarise(diff = sum(diff)) %>% 
+  mutate(dir = ifelse(sign(diff) == 1, "closer", "further")) %>% # flag the direction of the interaction
+  left_join(df_intra_small %>% select(taxon, n_dist_small), by = join_by(taxon)) %>% 
+  arrange(diff) %>% 
+  mutate(taxon = fct_inorder(taxon))
+
+# Store this with taxons information
+df_intra_small <- df_intra_small %>% left_join(ecdfs_dir, by = join_by(taxon, n_dist_small))
+
+# Plot the distribution of differences
+ggplot(ecdfs_dir) + geom_density(aes(x = diff))
+
+# Look at the relationship between the difference in ECDFs and the number of distances
+ggplot(ecdfs_dir) + 
+  geom_point(aes(x = n_dist_small, y = diff, colour = dir), size = 0.5) +
+  scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
+  scale_x_continuous(trans = "log10") +
+  labs(x = "Number of distances", y = "Sum of differences between plankton ECDF and null ECDF", colour = "Direction")
+
+ggplot(ecdfs_dir) +
+  geom_col(aes(y = taxon, x = diff, fill = dir)) +
+  scale_fill_manual(values = c("#67a9cf", "#ef8a62")) +
+  labs(x = "Sum of differences between plankton ECDF and null ECDF", y = "Taxon", fill = "Direction")
+
+# Kuiper statistic VS number of distances, with interaction direction
+ggplot() +
+  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_intra_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = dir), size = 0.5) +
+  scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Direction") 
+```
+
+If plankton ECDF is above null ECDF, it means that plankton distances are shorter than null distances. For Annelida, the difference is very noisy, so that no intrapretation is possible: we do not have enough distances.
 
 ### Interaction strength & confidence
 

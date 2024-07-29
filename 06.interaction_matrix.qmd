@@ -26,11 +26,11 @@ Read saved scores for both intra and inter distances and keep only relevant colu
 # Intra scores
 load("data/04c.df_intra_scores_small.Rdata")
 df_intra_scores <- df_intra_scores %>% 
-  select(t1 = taxon, t2 = taxon, test_stat, z_score, above)
+  select(t1 = taxon, t2 = taxon, test_stat, z_score, dir, above)
 # Inter scores
 load("data/05c.df_inter_scores_small.Rdata")
 df_inter_scores <- df_inter_scores %>% 
-  select(pair, test_stat, z_score, above)
+  select(pair, test_stat, z_score, dir, above)
 ```
 
 Assemble intra and inter scores. But first we need to compute average of both pairs A-B and B-A.
@@ -53,7 +53,10 @@ df_inter_scores <- df_inter_scores %>%
   summarise(
     test_stat = mean(test_stat),
     z_score = mean(z_score),
-    above = all(above) # both A-B and B-A should be above to consider the pair as above
+    # both A-B and B-A should have the same direction, otherwide set it to NA
+    dir = ifelse(length(unique(dir)) == 1, unique(dir), NA),
+    # both A-B and B-A should be above to consider the pair as above
+    above = all(above) 
   ) %>% 
   # regenerate taxa from pair
   separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"), cols_remove = FALSE)
@@ -64,12 +67,6 @@ df_inter_scores_bis <- df_inter_scores %>% rename(t2 = t1, t1 = t2)
 df_all <- df_intra_scores %>% 
   bind_rows(df_inter_scores) %>% 
   bind_rows(df_inter_scores_bis)
-
-# Drop colonial collodaria that has a segmentation artifact
-df_all <- df_all %>% 
-  filter(
-    !(str_detect(t1, "Collodaria_colonial") | str_detect(t2, "Collodaria_colonial"))
-  )
 
 # List taxa
 taxa <- df_all %>% select(t1) %>% unique() %>% pull(t1)
@@ -85,10 +82,24 @@ taxa <- df_all %>% select(t1) %>% unique() %>% pull(t1)
 df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
   left_join(df_all %>% select(-pair) %>% filter(above), by = join_by(t1, t2))
 
+# Plot Kuiper stat and Z-score
 ggplot(df_mat) +
   geom_raster(aes(x = t1, y = t2, fill = test_stat, alpha = z_score)) +
   scale_fill_viridis_c(na.value = NA) +
   labs(fill = "Kuiper\nstatistic", alpha = "Z-score") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  ) + 
+  coord_fixed()
+
+# Plot direction and Z-score
+ggplot(df_mat) +
+  geom_raster(aes(x = t1, y = t2, fill = dir, alpha = z_score)) +
+  scale_fill_manual(values = c("#67a9cf", "#ef8a62"), na.value = NA) +
+  labs(fill = "Direction", alpha = "Z-score") +
   theme_classic() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
