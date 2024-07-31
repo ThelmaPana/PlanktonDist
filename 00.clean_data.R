@@ -22,6 +22,7 @@ plankton <- plankton %>%
   select(
     transect, img_name, object_id = id, taxon,
     datetime, lat, lon, dist, depth,
+    esd = equivalent_diameter, # ESD
     x = centroid_1, y = centroid_0, # positional data
     contains("bbox") # for height and width
   ) %>% 
