@@ -20,7 +20,7 @@ counts <- plankton %>% count(img_name)
 n_pts <- counts %>% filter(n > 2) %>%  slice_sample(n = n_img) %>% pull(n)
 
 # Input data
-n_img <- 10 # number of images
+n_img <- 1000 # number of images
 
 ## Generate images
 #n_pts <- rep(n_pts, times = n_img)
@@ -86,6 +86,12 @@ res <- lapply(1:nrow(param_grid), function(i) {
       mutate(dist = dist * 51 / 10000)
   }, mc.cores = n_cores, ignore.interactive = TRUE) %>% 
     bind_rows()
+  
+  # Extract 10-000 quantiles
+  processed_images <- processed_images %>% 
+    select(when, dist) %>% 
+    group_by(when) %>% 
+    reframe(dist = quantile(dist, probs = seq(0, 1, length.out = 10000), names = FALSE))
   
   # Return results with parameter info
   processed_images %>% 

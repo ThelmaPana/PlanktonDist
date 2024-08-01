@@ -34,7 +34,9 @@ Let’s familiarise ourselves with model parameters:
 
 -   `d_length`: the displacement length of organisms (in px)
 
-Let’s take just one image as an example and see the effect of both parameters.
+-   `mv_prop`: the proportion of motile organisms (this one is straightforward)
+
+Let’s take just one image as an example and see the effect of both `h` and `d_length`.
 
 ```{r gen_image}
 #| fig-column: body-outset
@@ -145,19 +147,37 @@ ggplot(all_pts) +
   coord_fixed()
 ```
 
+Let’s stay between `100` and `400` px.
+
 ## Model results
+
+First, we only keep distances smaller than the threshold.
+
+```{r filter}
+# Discard distances below threshold
+sim_res <- sim_res %>% filter(dist < dist_thr_cm)
+```
 
 Plot distances before and after for various parameters.
 
 ```{r plot_dist}
 #| fig-column: body-outset
 #| out-width: 100%
+#| fig-height: 8
 ## Plot distances
-ggplot(sim_res) +
+p1 <- ggplot(sim_res %>% filter(prop_mv == 1)) +
   geom_density(aes(x = dist, colour = when)) +
   scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
-  labs(x = "Distance (cm)", y = "Density", colour = "When") +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 100%") +
   facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p2 <- ggplot(sim_res %>% filter(prop_mv == 0.8)) +
+  geom_density(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 80%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p1 / p2 + plot_layout(guides = "collect")
 ```
 
 Same for ECDF.
@@ -165,9 +185,62 @@ Same for ECDF.
 ```{r plot_ecdf}
 #| fig-column: body-outset
 #| out-width: 100%
-ggplot(sim_res) +
+#| fig-height: 8
+p3 <- ggplot(sim_res %>% filter(prop_mv == 1)) +
   stat_ecdf(aes(x = dist, colour = when)) +
   scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
-  labs(x = "Distance (cm)", y = "ECDF", colour = "When") +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 100%") +
   facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p4 <- ggplot(sim_res %>% filter(prop_mv == 0.8)) +
+  stat_ecdf(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 80%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p3 / p4 + plot_layout(guides = "collect")
+```
+
+## Compare model with observations
+
+```{r compare}
+#| fig-column: body-outset
+#| out-width: 100%
+
+load("data/03.all_distances.Rdata")
+
+# Get quantiles and reshape data
+df_all_dist <- df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
+  mutate(type = ifelse(type == "dist", "plankton", "null")) %>% 
+  mutate(dist = dist * 51 / 10000) %>% # from px to cm
+  filter(dist < dist_thr_cm) %>% # keep only distances below threshold
+  mutate(from = "Obs")
+
+# The parameter set we want
+param_set <- list(
+  d_length = 100,
+  h = 250000,
+  prop_mv = 0.8
+)
+
+# Get corresponding model simulation
+one_sim_res <- sim_res %>% 
+  # Keep only results for this parameter set
+  filter(
+    d_length == param_set$d_length & 
+    h == param_set$h & 
+    prop_mv == param_set$prop_mv
+  ) %>% 
+  select(type = when, dist) %>% 
+  mutate(type = ifelse(type == "before", "null", "plankton")) %>% 
+  mutate(from = "Model")
+
+# Assemble and plot
+ggplot(bind_rows(df_all_dist, one_sim_res)) +
+  geom_density(aes(x = dist, colour = type, linetype = from)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type", linetype = "From")
 ```
