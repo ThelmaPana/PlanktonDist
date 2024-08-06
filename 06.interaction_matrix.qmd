@@ -25,51 +25,28 @@ Read saved scores for both intra and inter distances and keep only relevant colu
 ```{r load}
 # Intra scores
 load("data/04c.df_intra_scores_small.Rdata")
-df_intra_scores <- df_intra_scores %>% 
-  select(t1 = taxon, t2 = taxon, test_stat, z_score, dir, above)
 # Inter scores
 load("data/05c.df_inter_scores_small.Rdata")
-df_inter_scores <- df_inter_scores %>% 
-  select(pair, test_stat, z_score, dir, above)
 ```
 
-Assemble intra and inter scores. But first we need to compute average of both pairs A-B and B-A.
+Assemble intra and inter scores.
 
 ```{r assemble}
-# Average within pairs for inter
-df_inter_scores <- df_inter_scores %>% 
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2")) 
+# Intra
+df_intra_mat <- df_intra_scores %>% 
+  select(t1 = taxon, t2 = taxon, test_stat, z_score, dir, above)
 
-# Average within pairs for inter
-df_inter_scores <- df_inter_scores %>% 
-  # make both A-B and B-A as A-B
-  mutate(pair = ifelse(
-    t1 < t2, 
-    paste0(t1, " - ", t2), 
-    paste0(t2, " - ", t1)
-  ), .before = t1) %>% 
-  # for each pair, compute average of test_stat, z_score and aboveness
-  group_by(pair) %>% 
-  summarise(
-    test_stat = mean(test_stat),
-    z_score = mean(z_score),
-    # both A-B and B-A should have the same direction, otherwide set it to NA
-    dir = ifelse(length(unique(dir)) == 1, unique(dir), NA),
-    # both A-B and B-A should be above to consider the pair as above
-    above = all(above) 
-  ) %>% 
-  # regenerate taxa from pair
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"), cols_remove = FALSE)
+# Inter
+df_inter_mat <- df_inter_scores %>% 
+  select(pair, test_stat, z_score, dir, above) %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"))
 # and generate reverse of t1 / t2
-df_inter_scores_bis <- df_inter_scores %>% rename(t2 = t1, t1 = t2)
+df_inter_mat_bis <- df_inter_mat %>% rename(t2 = t1, t1 = t2)
 
-## Bind together intra and inter
-df_all <- df_intra_scores %>% 
-  bind_rows(df_inter_scores) %>% 
-  bind_rows(df_inter_scores_bis)
-
-# List taxa
-taxa <- df_all %>% select(t1) %>% unique() %>% pull(t1)
+# Store all together
+df_pairs <- df_intra_mat %>% 
+  bind_rows(df_inter_mat) %>% 
+  bind_rows(df_inter_mat_bis)
 ```
 
 ## Build the matrix
@@ -79,8 +56,9 @@ taxa <- df_all %>% select(t1) %>% unique() %>% pull(t1)
 #| out-width: 100%
 
 # Create all combination of taxa and join scores
+taxa <- sort(unique(df_pairs$t1))
 df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
-  left_join(df_all %>% select(-pair) %>% filter(above), by = join_by(t1, t2))
+  left_join(df_pairs %>% filter(above), by = join_by(t1, t2))
 
 # Plot Kuiper stat and Z-score
 ggplot(df_mat) +
