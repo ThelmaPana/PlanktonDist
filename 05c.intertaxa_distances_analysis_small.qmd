@@ -75,6 +75,8 @@ rib_data <- tibble(n_dist = lim_dist) %>%
 
 ### Plankton distances
 
+### Kuiper test on small distances
+
 We need to filter distances to keep only the small distances, and perform the Kuiper test using these filtered distances.
 
 ```{r filter_dist}
@@ -118,7 +120,32 @@ df_inter_small <- df_inter %>%
     log_test_stat = log10(test_stat) # log transform test stat
   ) %>% 
   filter(n_dist_small > 100) # keep only pairs with at least 100 small distances
+```
 
+### Compute mean per pair
+
+```{r mean_pair}
+# Compute mean per pair
+df_inter_small <- df_inter_small %>% 
+  separate_wider_delim(pair, delim = " - ", names = c("p1", "p2"), cols_remove = FALSE) %>% 
+  mutate(
+    pair_unsrt = ifelse(
+      p1 < p2,
+      paste(p1, p2, sep = " - "),
+      paste(p2, p1, sep = " - ")
+    ), .after = pair
+  )
+
+# Compute average of stats per pair
+df_inter_small <- df_inter_small %>% 
+  select(pair = pair_unsrt, n_dist:log_test_stat) %>% 
+  group_by(pair) %>% 
+  summarise_if(is.numeric, mean)
+```
+
+### Detect pairs above the ribbon
+
+```{r detect_above}
 # Detect taxa which are above the ribbon and have enough distances
 df_inter_small <- df_inter_small %>% 
   mutate(
@@ -358,5 +385,5 @@ ggplot(df_inter_scores) +
 Save Z-score and Kuiper stat.
 
 ```{r save}
-save(df_inter_scores, file = "data/05c.df_inter_scores_small.Rdata")
+save(df_inter_scores, df_inter_dist_small, file = "data/05c.df_inter_scores_small.Rdata")
 ```
