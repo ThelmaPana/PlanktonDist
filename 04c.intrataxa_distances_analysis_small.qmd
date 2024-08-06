@@ -85,11 +85,18 @@ rib_data <- tibble(n_dist = lim_dist) %>%
 We need to filter distances to keep only the small distances, and perform the Kuiper test using these filtered distances.
 
 ```{r filter_dist}
-# Keep only small distances
+## Keep only small distances
+#df_intra_dist_small <- df_intra_dist %>% 
+#  pivot_longer(dist:dist_rand) %>% 
+#  mutate(value = value * 51 / 10000) %>% # from pixel to cm
+#  filter(value < dist_thr_cm)
+
 df_intra_dist_small <- df_intra_dist %>% 
   pivot_longer(dist:dist_rand) %>% 
-  mutate(value = value * 51 / 10000) %>% # from pixel to cm
-  filter(value < dist_thr_cm)
+  mutate(value = value * 51 / 10000) %>% 
+  left_join(plankton_esd, by = join_by(taxon)) %>% 
+  filter(value < dist_thr)
+
 
 # Perform Kuiper test using only small distances
 df_intra_small <- mclapply(df_intra$taxon, function (ta) {
@@ -267,7 +274,7 @@ ggplot(ecdfs_dir) + geom_density(aes(x = diff))
 
 # Look at the relationship between the difference in ECDFs and the number of distances
 ggplot(ecdfs_dir) + 
-  geom_point(aes(x = n_dist_small, y = diff, colour = dir), size = 0.5) +
+  geom_point(aes(x = n_dist_small, y = diff, colour = dir)) +
   scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
   scale_x_continuous(trans = "log10") +
   labs(x = "Number of distances", y = "Sum of differences between plankton ECDF and null ECDF", colour = "Direction")
@@ -281,7 +288,7 @@ ggplot(ecdfs_dir) +
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = df_intra_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = dir), size = 0.5) +
+  geom_point(data = df_intra_small %>% filter(above), aes(x = log_n_dist_small, y = log_test_stat, colour = dir)) +
   scale_colour_manual(values = c("#67a9cf", "#ef8a62")) +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
@@ -331,11 +338,11 @@ df_intra_scores %>%
   filter(above) %>% 
   #filter(!str_detect(taxon, "Collodaria_colonial")) %>% 
   ggplot() + 
-  geom_point(aes(x = test_stat, y = z_score, colour = taxon, fill = taxon, shape = taxon)) +
+  geom_point(aes(x = test_stat, y = z_score, colour = taxon, fill = taxon, shape = dir)) +
   scale_colour_manual(values = df_intra_small_above$colour) +
   scale_fill_manual(values = df_intra_small_above$colour) +
-  scale_shape_manual(values = df_intra_small_above$shape) +
-  labs(x = "Kuiper statistic", y = "Z-score", colour = "Taxon", fill = "Taxon", shape = "Taxon") +
+  #scale_shape_manual(values = df_intra_small_above$shape) +
+  labs(x = "Kuiper statistic", y = "Z-score", colour = "Taxon", fill = "Taxon", shape = "Dir") +
   expand_limits(x = 0, y = 0) +
   xlim(c(0, 0.05))
 ```
@@ -351,5 +358,5 @@ df_intra_scores %>%
 Save Z-score and Kuiper stat.
 
 ```{r save}
-save(df_intra_scores, df_intra_dist_small, file = "data/04c.df_intra_scores_small.Rdata")
+#save(df_intra_scores, df_intra_dist_small, file = "data/04c.df_intra_scores_small.Rdata")
 ```

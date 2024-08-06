@@ -31,6 +31,7 @@ library(cmocean)
 library(scales)
 library(ggtext)
 library(paletteer)
+library(khroma)
 
 
 theme_set(theme_minimal())
@@ -44,10 +45,31 @@ n_dist <- 10000 # number of distances to retain for comparisons
 
 ## Distance threshold ----
 #--------------------------------------------------------------------------#
-# Only consider distances smaller than this threshold
+# Minimum number of distances to include a group/pair in analyses
+n_dist_min <- 10000 
+
+# Load ESD for taxonomic groups
+load("data/plankton_esd.Rdata")
+
+# Method for thresholding distances (constant or proportional to ESD)
+thres_met <- "constant"
 dist_thr_cm <- 10 # in cm
-dist_thr_px <- (dist_thr_cm * 10000) / 51 # in px
-n_dist_min <- 10000 # minimum number of distances to include a group/pair in analyses
+
+#thres_met <- "esd"
+#k <- 50 # ESD to distance factor
+
+if (thres_met == "esd") { # proportional to ESD
+  # Compute distance threshold based on k and median ESD for each taxon
+  plankton_esd <- plankton_esd %>% 
+    mutate(dist_thr = med_esd * k) %>% 
+    select(-med_esd) 
+  
+} else if (thres_met == "constant") { # constant for all taxonomic groups
+  # Use the threshold for all taxa
+  plankton_esd <- plankton_esd %>% 
+    select(taxon) %>% 
+    mutate(dist_thr = dist_thr_cm)
+}
 
 
 ## Image volume ----

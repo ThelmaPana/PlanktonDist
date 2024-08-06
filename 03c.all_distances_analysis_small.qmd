@@ -67,14 +67,15 @@ We need to filter distances to keep only the small distances, and perform the Ku
 df_all_dist <- df_all %>% 
   dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
-  mutate(
-    dist = dist * 51 / 10000,
-    dist_rand = dist_rand * 51 / 10000
-  ) # from pixel to cm
+  pivot_longer(dist:dist_rand) %>% 
+  mutate(value = value * 51 / 10000) # from pixel to cm
+
+# Get distance threshold
+dist_thr <- plankton_esd %>% filter(taxon == "all") %>% pull(dist_thr)
 
 # Extract distances smaller than a given threshold
-dist_small <- df_all_dist %>% dplyr::select(dist) %>% filter(dist < dist_thr_cm) %>% pull(dist) # plankton
-dist_rand_small <- df_all_dist %>% dplyr::select(dist_rand) %>% filter(dist_rand < dist_thr_cm) %>% pull(dist_rand) # null
+dist_small <- df_all_dist %>% filter(name == "dist") %>% filter(value < dist_thr) %>% pull(value) # plankton
+dist_rand_small <- df_all_dist %>% filter(name == "dist_rand") %>% filter(value < dist_thr) %>% pull(value) # null
 
 # Store this in a tibble
 df_all_dist_small <- bind_rows(
@@ -153,5 +154,5 @@ df_all_dist_small %>%
 Save processed data.
 
 ```{r save}
-save(f_val_dist, rib_data, df_all, df_all_dist_small, file = "data/03c.all_distances_processed.Rdata")
+#save(f_val_dist, rib_data, df_all, df_all_dist_small, file = "data/03c.all_distances_processed.Rdata")
 ```
