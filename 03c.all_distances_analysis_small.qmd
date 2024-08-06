@@ -64,7 +64,7 @@ We need to filter distances to keep only the small distances, and perform the Ku
 
 ```{r filter_dist}
 # Get distances
-df_dist <- df_all %>% 
+df_all_dist <- df_all %>% 
   dplyr::select(dist, dist_rand) %>% 
   unnest(c(dist, dist_rand)) %>% 
   mutate(
@@ -73,11 +73,11 @@ df_dist <- df_all %>%
   ) # from pixel to cm
 
 # Extract distances smaller than a given threshold
-dist_small <- df_dist %>% dplyr::select(dist) %>% filter(dist < dist_thr_cm) %>% pull(dist) # plankton
-dist_rand_small <- df_dist %>% dplyr::select(dist_rand) %>% filter(dist_rand < dist_thr_cm) %>% pull(dist_rand) # null
+dist_small <- df_all_dist %>% dplyr::select(dist) %>% filter(dist < dist_thr_cm) %>% pull(dist) # plankton
+dist_rand_small <- df_all_dist %>% dplyr::select(dist_rand) %>% filter(dist_rand < dist_thr_cm) %>% pull(dist_rand) # null
 
 # Store this in a tibble
-df_dist_small <- bind_rows(
+df_all_dist_small <- bind_rows(
     tibble(type = "data", dist = dist_small),
     tibble(type = "rand", dist = dist_rand_small)
   )
@@ -95,7 +95,8 @@ kt <- kuiper_test(dist_small, dist_rand_small)
 df_all <- df_all %>% 
   mutate(
     n_dist_small = n_dist * prop_dist_small,
-    log_n_dist_small = log10(n_dist_small)
+    log_n_dist_small = log10(n_dist_small),
+    test_stat_small = kt[1]
   )
 ```
 
@@ -108,8 +109,7 @@ Plot Kuiper statistic VS number of distances.
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
   geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  #geom_point(data = df_all, aes(x = log_n_dist, y = log_test_stat), colour = "blue") +
-  geom_point(aes(x = df_all$log_n_dist_small, y = log10(kt[1])), colour = "red") +
+  geom_point(data = df_all, aes(x = log_n_dist_small, y = log10(test_stat_small)), colour = "red") +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   labs(x = "N distances", y = "Kuiper statistic")
@@ -120,7 +120,7 @@ Plot distribution of distances.
 
 ```{r dist}
 # Plot distribution
-df_dist_small %>% 
+df_all_dist_small %>% 
   ggplot() + 
   geom_density(aes(x = dist, colour = type)) +
   scale_colour_manual(
@@ -134,7 +134,7 @@ Plot ECDF.
 
 ```{r ecdf}
 # and ECDF
-df_dist_small %>% 
+df_all_dist_small %>% 
   ggplot() + 
   stat_ecdf(aes(x = dist, colour = type)) +
   scale_colour_manual(
@@ -149,3 +149,9 @@ df_dist_small %>%
 
 **Distances between planktonic organisms at the local scale differ from the distances that could be expected if plankton was randomly distributed.**
 :::
+
+Save processed data.
+
+```{r save}
+save(f_val_dist, rib_data, df_all, df_all_dist_small, file = "data/03c.all_distances_processed.Rdata")
+```
