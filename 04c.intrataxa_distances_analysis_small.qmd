@@ -351,5 +351,5 @@ df_intra_scores %>%
 Save Z-score and Kuiper stat.
 
 ```{r save}
-save(df_intra_scores, file = "data/04c.df_intra_scores_small.Rdata")
+save(df_intra_scores, df_intra_dist_small, file = "data/04c.df_intra_scores_small.Rdata")
 ```
