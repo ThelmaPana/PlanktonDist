@@ -1,0 +1,100 @@
+---
+title: "Test for overall randomness of plankton distributions"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+## Load data
+
+```{r read}
+#| cache.lazy: false
+load("data/05a.all_distances_ks.Rdata")
+load("data/04b.null_ks.Rdata")
+```
+
+## Process data
+
+Need to apply log transformation to number of distances and Kuiper statistic.
+
+```{r log_transform}
+df_all <- df_all %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+```
+
+## Results
+
+### Kuiper stat VS number of distances
+
+```{r ks_n_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_all, aes(x = log_n_dist, y = log_kuiper_stat), colour = "#00B2FF") +
+  labs(x = "N distances", y = "Kuiper statistic") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+Plankton distances differ from those expected under a random distribution of planktonic organisms. Let’s now check how they vary.
+
+### Distribution of distances
+
+Start by plotting distribution of distances
+
+```{r plot_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+df_all_dist <- df_all_dist %>% 
+  pivot_longer(plank:rand, names_to = "type", values_to = "dist") %>% 
+  mutate(
+    type = ifelse(type == "plank", "Plankton", "Null"), # nicer names
+    type = factor(type, levels = c("Plankton", "Null")) # convert to factor
+    )
+
+ggplot(df_all_dist) +
+  geom_density(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  theme_classic()
+```
+
+Let’s plot ECDF.
+
+```{r plot_ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot(df_all_dist) +
+  stat_ecdf(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
+  labs(x = "Distance (cm)", y = "ECDF", colour = "Type") +
+  theme_classic()
+```
+
+To automatically detect the sense of variation, we can compute the difference between plankton ECDF and null  ECDF.
+
+::: {.callout-note icon="false"}
+## Conclusion
+
+**Distances between planktonic organisms differ from the distances that could be expected if plankton was randomly distributed: planktonic organisms are closer.**
+:::

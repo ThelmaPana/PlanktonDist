@@ -1,0 +1,144 @@
+---
+title: "Find the optimal distance threshold for all distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+## Read distances
+
+```{r read}
+#| cache.lazy: false
+plank_dist <- read_parquet("data/distances/03.plankton_dist.parquet")
+rand_dist <- read_parquet("data/distances/03.random_dist.parquet")
+```
+
+## Coarse thresholding
+
+Define a list of threshold to try. Then:
+
+-   filter distances
+
+-   compute 10000-quantiles
+
+-   perform Kuiper test
+
+```{r coarse_thres}
+# Thresholds to try
+thres <- seq(5, 70, by = 5)
+# And then betwenn 5 and 15 by 1
+
+# Probs to compute the quantiles
+probs <- seq(0, 1, length.out = 10000)
+
+# Loop over thresholds
+coarse_thr <- lapply(thres, function(thr) {
+  message(paste0("Thresholding at ", thr, " cm"))
+  
+  # Filter distances
+  df_plank <- plank_dist %>% filter(dist < thr)
+  df_rand <- rand_dist %>% filter(dist < thr)
+  
+  # Extract quantiles
+  plank_qt <- quantile(df_plank$dist, probs = probs, names = FALSE)
+  rand_qt <- quantile(df_rand$dist, probs = probs, names = FALSE)
+  
+  # Perform kuiper test
+  kt <- kuiper_stat(plank_qt, rand_qt)
+  
+  # Save results
+  res <- tibble(
+    dist_thres = thr,
+    kuiper_stat = kt
+  )
+  
+  # Return results
+  return(res)
+  
+}) %>% 
+  bind_rows()
+```
+
+Plot results
+
+```{r plot_coarse}
+ggplot(coarse_thr) +
+  geom_point(aes(x = dist_thres, y = kuiper_stat)) +
+  geom_vline(xintercept = coarse_thr %>% arrange(desc(kuiper_stat)) %>% slice(1) %>% pull(dist_thres), colour = "red") +
+  labs(x = "Distance threshold (cm)", y = "Kuiper statistic")
+```
+
+We identify maximum at `r coarse_thr$dist_thres[which.max(coarse_thr$kuiper_stat)]` cm. Let’s try to refine it with 1 cm precision.
+
+## Fine thresholding
+
+We redo the same steps as above:
+
+-   filter distances
+
+-   compute 10000-quantiles
+
+-   perform Kuiper test
+
+```{r fine_thres}
+# Thresholds to try
+thres <- seq(5, 20, by = 1)
+
+# Loop over thresholds
+fine_thr <- lapply(thres, function(thr) {
+  message(paste0("Thresholding at ", thr, " cm"))
+  
+  # Filter distances
+  df_plank <- plank_dist %>% filter(dist < thr)
+  df_rand <- rand_dist %>% filter(dist < thr)
+  
+  # Extract quantiles
+  plank_qt <- quantile(df_plank$dist, probs = probs, names = FALSE)
+  rand_qt <- quantile(df_rand$dist, probs = probs, names = FALSE)
+  
+  # Perform kuiper test
+  kt <- kuiper_stat(plank_qt, rand_qt)
+  
+  # Save results
+  res <- tibble(
+    dist_thres = thr,
+    kuiper_stat = kt
+  )
+  
+  # Return results
+  return(res)
+  
+}) %>% 
+  bind_rows()
+```
+
+Plot results
+
+```{r plot_fine}
+ggplot(fine_thr) +
+  geom_point(aes(x = dist_thres, y = kuiper_stat)) +
+  geom_vline(xintercept = fine_thr %>% arrange(desc(kuiper_stat)) %>% slice(1) %>% pull(dist_thres), colour = "red") +
+  labs(x = "Distance threshold (cm)", y = "Kuiper statistic")
+```
+
+The refined threshold indicates a maximum of information when considering distances below `r fine_thr$dist_thres[which.max(fine_thr$kuiper_stat)]` cm.
+
+::: callout-note
+## Conclusion
+
+Let’s focus of distances below 11 cm.
+:::

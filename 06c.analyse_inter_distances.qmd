@@ -1,0 +1,294 @@
+---
+title: "Analyze intertaxonomic distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+## Load data
+
+```{r load_data}
+load("data/05c.inter_distances_ks.Rdata")
+load("data/04b.null_ks.Rdata")
+```
+
+## Process data
+
+Need to apply log transformation to number of distances and Kuiper statistic.
+
+Let’s also identify taxonomic groups for which we have non random distances in order to plot them in colour.
+
+```{r process}
+# Remove colonial Collodaria (segmentation artifact)
+df_inter <- df_inter %>% filter(!str_detect(pair, "Collodaria_colonial"))
+df_inter_dist <- df_inter_dist %>% filter(!str_detect(pair, "Collodaria_colonial"))
+
+# Log transform n dist and kuiper stat
+df_inter <- df_inter %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+
+# Compute average for pairs A-B and B-A
+df_inter <- df_inter %>% 
+  # separate pair into 2 taxonomic groups
+  separate_wider_delim(pair, delim = "-", names = c("t1", "t2")) %>% 
+  # generate unsorted pair name (both A-B and B-A become A-B)
+  mutate(
+    pair_unsrt = ifelse(t1 < t2, paste(t1, t2, sep = "-"), paste(t2, t1, sep = "-")),
+    .after = t2
+  ) %>% 
+  select(-c(t1, t2)) %>% 
+  # group by unsorted pair and average all metrics
+  group_by(pair_unsrt) %>% 
+  summarise_all(mean) %>% 
+  rename(pair = pair_unsrt)
+
+# Identify taxa above the threshold and that have enough distances
+# First, get slope and intercept of the 0.95 qt regression
+intercept <- null_ks_rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
+slope <- null_ks_rq_coef %>% filter(tau == 0.95) %>% pull(slope)
+df_inter <- df_inter %>% 
+  mutate(
+    above = log_kuiper_stat > slope * log_n_dist + intercept, # above the 0.95 qt reg
+    enough = n_dist > n_dist_min, # are there enough distances
+    sig = above & enough # significant if above and enough
+    )
+
+# Assign unique colour and shape to each taxon
+df_inter_sig <- df_inter %>% 
+  filter(sig) %>% 
+   mutate(
+    colour = as.character(paletteer_d(`"khroma::discreterainbow"`, n = sum(df_inter$sig))),
+    shape = rep(21:25, 6)[1:sum(df_inter$sig)]
+  )#
+```
+
+## Results
+
+### Kuiper statistic VS number of distances
+
+All taxonomic groups.
+
+```{r ks_n_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter, aes(x = log_n_dist, y = log_kuiper_stat)) +
+  labs(x = "N distances", y = "Kuiper statistic") +
+  scale_fill_manual(values = df_inter_sig$colour) +
+  scale_colour_manual(values = df_inter_sig$colour) +
+  scale_shape_manual(values = df_inter_sig$shape) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+Only those differing from random.
+
+```{r ks_n_dist_sig}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter %>% filter(!sig), aes(x = log_n_dist, y = log_kuiper_stat), colour = "grey") +
+  geom_point(data = df_inter_sig, aes(x = log_n_dist, y = log_kuiper_stat, colour = pair, fill = pair, shape = pair), show.legend = FALSE) +
+  labs(x = "N distances", y = "Kuiper statistic") +
+  scale_fill_manual(values = df_inter_sig$colour) +
+  scale_colour_manual(values = df_inter_sig$colour) +
+  scale_shape_manual(values = df_inter_sig$shape) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+### Distribution of distances
+
+Start by plotting distribution of distances for a subsample of significant pairs.
+
+```{r plot_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+# Reformat the distance dataframe
+df_inter_dist <- df_inter_dist %>% 
+  pivot_longer(plank_qt:rand_qt, names_to = "type", values_to = "dist") %>% 
+  mutate(
+    type = ifelse(type == "plank_qt", "Plankton", "Null"), # nicer names
+    type = factor(type, levels = c("Plankton", "Null")) # convert to factor
+    ) %>% 
+  # keep only significant groups
+  filter(pair %in% df_inter_sig$pair)
+
+pairs_to_plot <- df_inter_sig %>% slice_sample(n = 12)
+
+ggplot(df_inter_dist %>% filter(pair %in% pairs_to_plot$pair)) +
+  geom_density(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  theme_classic() +
+  theme(strip.background = element_rect(colour = "white")) +
+  facet_wrap(~pair, scales = "free", ncol = 3)
+```
+
+Let’s plot ECDF.
+
+```{r plot_ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot(df_inter_dist %>% filter(pair %in% pairs_to_plot$pair)) +
+  stat_ecdf(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  theme_classic() +
+  theme(strip.background = element_rect(colour = "white")) +
+  facet_wrap(~pair, scales = "free", ncol = 3)
+```
+
+To automatically detect the sense of variation, we can compute the difference between plankton ECDF and null  ECDF.
+
+First, we need to compute ECDFs.
+
+```{r compute_ecdfs}
+# X axis on which to compute ECDFs
+x_axis_seq <- seq(0, dist_thr, length.out = 1000)
+
+# Reshape df to have one row per pair
+df_inter_dist_wide <- df_inter_dist %>% 
+  pivot_wider(names_from = type, values_from = dist, values_fn = list) %>% 
+  filter(pair %in% df_inter_sig$pair)
+
+# Loop over taxa
+ecdfs_inter <- lapply(1:nrow(df_inter_dist_wide), function(i) {
+  # Get row
+  r <- df_inter_dist_wide %>% slice(i)  
+  
+  # Compute ecdf
+  # Needs a nested call: ecdf(x) returns a function, x being the values of interest
+  # Call this function with argument x2 to get values along x2 (here, plankton distances so that we have a common x axis) 
+  plank_ecdf <- ecdf(unlist(r$Plankton))(x_axis_seq)
+  null_ecdf <- ecdf(unlist(r$Null))(x_axis_seq)
+  
+  # Return difference
+  res <- tibble(
+    x_axis_seq = x_axis_seq,
+    plank_ecdf = plank_ecdf,
+    null_ecdf = null_ecdf,
+    diff = plank_ecdf - null_ecdf
+    ) %>% 
+    mutate(pair = r$pair) %>% # add pair
+    select(pair, everything())
+  return(res)
+}) %>% 
+  bind_rows()
+```
+
+Now let’s plot the difference between plankton ECDF and null ECDF.
+
+```{r plot_ecdf_diff}
+#| fig-column: body-outset
+#| out-width: 100%
+ggplot(ecdfs_inter %>% filter(pair %in% df_inter_sig$pair)) + 
+  geom_hline(yintercept = 0, colour = "gray") +
+  geom_path(aes(x = x_axis_seq, y = diff), colour = "#00B2FF") +
+  labs(x = "Distance (cm)", y = "Plankton ECDF - Null ECDF") +
+  theme_classic() +
+  theme(strip.background = element_rect(colour = "white")) +
+  facet_wrap(~pair, scales = "free", ncol = 3)
+```
+
+Now let’s automatically detect which ECDF is above for all pairs.
+
+```{r detect_ecdf_above}
+ecdfs_inter_sum <- ecdfs_inter %>% 
+  group_by(pair) %>% 
+  summarise(tot_diff = sum(diff))
+ggplot(ecdfs_inter_sum) + 
+  geom_vline(xintercept = 0, colour = "grey80", linewidth = 2) +
+  geom_density(aes(x = tot_diff))
+```
+
+For nearly all pairs groups, plankton ECDF is above null  ECDF, indicating more short distances, i.e. planktonic organisms are closer than expected.
+
+Let’s now compute the interaction strength and confidence for each pair.
+
+### Interaction strength & confidence
+
+Interaction strength corresponds to the Kuiper statistic while confidence is computed as the Z-score between Kuiper statistic and the distribution of null Kuiper statistics.
+
+```{r z_scores}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Compute Z-scores
+df_inter_scores <- df_inter %>% 
+  mutate(
+    # compute estimated mean, 5th and 95th percentiles kuiper-stat from slope and intercept
+    ymin = 
+      null_ks_rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + 
+      null_ks_rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
+    ymean = 
+      null_ks_rq_coef %>% filter(tau == "mean") %>% pull(slope) * log_n_dist + 
+      null_ks_rq_coef %>% filter(tau == "mean") %>% pull(intercept),
+    ymax = 
+      null_ks_rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + 
+      null_ks_rq_coef %>% filter(tau == 0.95) %>% pull(intercept),
+    # compute sigma
+    sigma = (ymax - ymin) / (2 * 1.645),
+    # compute z-score
+    z_score = (log_kuiper_stat - ymean)/sigma
+  )
+
+# Plot Z-score
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_inter_scores %>% filter(sig), aes(x = log_n_dist, y = log_kuiper_stat, colour = z_score)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Z-score") +
+  scale_colour_viridis_c() +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+Plot Z-score VS Kuiper statistic for significant taxa.
+
+```{r plot_z}
+#| fig-column: body-outset
+#| out-width: 100%
+
+df_inter_scores %>% 
+  filter(sig) %>% 
+  ggplot() + 
+  geom_point(aes(x = kuiper_stat, y = z_score, colour = pair, fill = pair, shape = pair), show.legend = FALSE) +
+  scale_colour_manual(values = df_inter_sig$colour) +
+  scale_fill_manual(values = df_inter_sig$colour) +
+  scale_shape_manual(values = df_inter_sig$shape) +
+  labs(x = "Kuiper statistic", y = "Z-score") +
+  expand_limits(x = 0, y = 0) +
+  theme_classic()
+```
+
+## Save
+
+Save Z-score and Kuiper stat.
+
+```{r save}
+save(df_inter_scores, file = "data/06c.df_inter_scores.Rdata")
+```

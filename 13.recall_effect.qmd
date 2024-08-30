@@ -1,0 +1,25 @@
+---
+title: "Effect of recall on distribution of distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+Let’s use the agent-based model positions that are representative of plankton position and arbitrary remove some points to simulate lower recall, recompute distances and check if they are representative of overall distances.
+
+```{r set_up}
+#|cache: false
+source("utils.R")
+```
+
+```{r}
+load("data/simulation_results.Rdata")
+```

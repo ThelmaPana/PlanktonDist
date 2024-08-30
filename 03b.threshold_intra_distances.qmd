@@ -1,0 +1,140 @@
+---
+title: "Find the optimal distance threshold for intra taxonomic distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+```
+
+## Read distances
+
+```{r read}
+#| cache.lazy: false
+# List and read files
+if (sub_sample){ # with subsampling
+  saved <- list.files("data/distances", pattern = "^(02b.sub).*(.parquet)$", full.names = TRUE)
+} else { # without subsampling
+  saved <- list.files("data/distances", pattern = "^(02b.intra).*(.parquet)$", full.names = TRUE)
+}
+
+# List taxonomic groups
+taxa <- str_split_fixed(saved, "_", n = 3)[,3] %>% str_remove_all(".parquet")
+
+# Remove colonial Collodaria (segmentation artifact)
+taxa <- taxa[!str_detect(taxa, "Collodaria_colonial")]
+saved <- saved[!str_detect(saved, "Collodaria_colonial")]
+
+# Thresholds to try
+thres <- seq(5, 20, by = 1)
+```
+
+## Thresholding
+
+Here we focus on distances between 5 and 20 cm with an increment of 1 cm, as 11 cm was found as the optimal threshold when focusing on all distances regardless of taxonomy.
+
+For each taxonomic group, we:
+
+-   filter distances
+
+-   compute 10000-quantiles
+
+-   perform Kuiper test
+
+```{r fine_thr_taxa}
+intra_thr <- lapply(saved, function(file_name) {
+  # Get taxon for given file
+  my_taxon <- str_split_fixed(file_name, "_", n = 3)[,3] %>% str_remove_all(".parquet")  
+  
+  # Read distances
+  df <- read_parquet(file = file_name)
+  plank_dist <- df %>% select(dist)
+  rand_dist <- df %>% select(dist = rand_dist)
+  
+  # Loop over thresholds
+  taxa_thr <- lapply(thres, function(thr) {
+    message(paste0(my_taxon, " at ", thr, " cm"))
+    
+    # Filter distances
+    df_plank <- plank_dist %>% filter(dist < thr)
+    df_rand <- rand_dist %>% filter(dist < thr)
+    
+    # Extract quantiles
+    plank_qt <- quantile(df_plank$dist, probs = probs, names = FALSE)
+    rand_qt <- quantile(df_rand$dist, probs = probs, names = FALSE)
+    
+    # Perform kuiper test
+    ks <- kuiper_stat(plank_qt, rand_qt)
+    
+    # Save results
+    res <- tibble(
+      taxon = my_taxon,
+      dist_thres = thr,
+      kuiper_stat = ks,
+      n_dist_plank = nrow(df_plank),
+      n_dist_rand = nrow(df_rand)
+    ) %>% 
+      mutate(n_dist = (n_dist_plank + n_dist_rand) / 2)
+    
+    # Return results
+    return(res)
+    
+  }) %>% 
+    bind_rows()
+  
+  return(taxa_thr)
+}) %>% 
+  bind_rows()
+```
+
+Let’s plot results.
+
+```{r plot_fine_thres}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 10
+ggplot(intra_thr) +
+  geom_point(aes(x = dist_thres, y = kuiper_stat), size = 0.8) +
+  facet_wrap(~taxon, scales = "free", ncol = 4) +
+  labs(x = "Distance threshold (cm)", y = "Kuiper statistic")
+```
+
+We detect an optimum around 10 cm for about half of considered taxa.
+
+Now find the optimal for each taxon and plot it VS the number of distances. Add a line at 11 cm to highlight the global optimal threshold.
+
+```{r plot_opt}
+#| fig-column: body-outset
+#| out-width: 100%
+intra_opt <- intra_thr %>% 
+  group_by(taxon) %>% 
+  filter(kuiper_stat == max(kuiper_stat)) %>% 
+  ungroup()
+
+ggplot(intra_opt) +
+  geom_hline(yintercept = 11, colour = "grey") +
+  geom_point(aes(x = n_dist, y = dist_thres)) +
+  labs(x = "Number of distances", y = "Identified threshold (cm)") +
+  scale_x_log10()
+```
+
+As long as enough distances are available, the identified threshold is around 11 cm.
+
+::: callout-note
+## Conclusion
+
+The global threshold of 11 cm is fine for intra taxonomic distances.
+:::

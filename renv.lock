@@ -396,6 +396,22 @@
       ],
       "Hash": "ac6cdb8552c61bd36b0e54d07cf2aab7"
     },
+    "castr": {
+      "Package": "castr",
+      "Version": "0.1.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "castr",
+      "RemoteUsername": "jiho",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "7c5667b8308b19fbe33e4517c312b9acc12b5ba9",
+      "Requirements": [
+        "R",
+        "stats"
+      ],
+      "Hash": "2e58f1073ff1da35710e082e6e3a61d9"
+    },
     "cellranger": {
       "Package": "cellranger",
       "Version": "1.1.0",
@@ -519,6 +535,19 @@
         "utils"
       ],
       "Hash": "e8a1e41acf02548751f45c718d55aa6a"
+    },
+    "crosstalk": {
+      "Package": "crosstalk",
+      "Version": "1.2.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R6",
+        "htmltools",
+        "jsonlite",
+        "lazyeval"
+      ],
+      "Hash": "ab12c7b080a57475248a30f4db6298c0"
     },
     "curl": {
       "Package": "curl",
@@ -1105,6 +1134,21 @@
       ],
       "Hash": "2d7b3857980e0e0d0a1fd6f11928ab0f"
     },
+    "htmlwidgets": {
+      "Package": "htmlwidgets",
+      "Version": "1.6.4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "grDevices",
+        "htmltools",
+        "jsonlite",
+        "knitr",
+        "rmarkdown",
+        "yaml"
+      ],
+      "Hash": "04291cc45198225444a397606810ac37"
+    },
     "httr": {
       "Package": "httr",
       "Version": "1.4.7",
@@ -1207,6 +1251,21 @@
       ],
       "Hash": "d7d6a7cb690ac73eeced99e1ed9d6cdb"
     },
+    "khroma": {
+      "Package": "khroma",
+      "Version": "1.13.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "grDevices",
+        "graphics",
+        "grid",
+        "stats",
+        "utils"
+      ],
+      "Hash": "fa33324d148f6620d3ba24394bc2eac7"
+    },
     "knitr": {
       "Package": "knitr",
       "Version": "1.45",
@@ -1253,6 +1312,17 @@
       ],
       "Hash": "b64ec208ac5bc1852b285f665d6368b3"
     },
+    "later": {
+      "Package": "later",
+      "Version": "1.3.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Rcpp",
+        "rlang"
+      ],
+      "Hash": "a3e051d405326b8b0012377434c62b37"
+    },
     "lattice": {
       "Package": "lattice",
       "Version": "0.22-6",
@@ -1267,6 +1337,16 @@
         "utils"
       ],
       "Hash": "cc5ac1ba4c238c7ca9fa6a87ca11a7e2"
+    },
+    "lazyeval": {
+      "Package": "lazyeval",
+      "Version": "0.2.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "d908914ae53b04d4c0c0fd72ecc35370"
     },
     "lifecycle": {
       "Package": "lifecycle",
@@ -1636,6 +1716,38 @@
       ],
       "Hash": "903d68319ae9923fb2e2ee7fa8230b91"
     },
+    "plotly": {
+      "Package": "plotly",
+      "Version": "4.10.4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "RColorBrewer",
+        "base64enc",
+        "crosstalk",
+        "data.table",
+        "digest",
+        "dplyr",
+        "ggplot2",
+        "htmltools",
+        "htmlwidgets",
+        "httr",
+        "jsonlite",
+        "lazyeval",
+        "magrittr",
+        "promises",
+        "purrr",
+        "rlang",
+        "scales",
+        "tibble",
+        "tidyr",
+        "tools",
+        "vctrs",
+        "viridisLite"
+      ],
+      "Hash": "a1ac5c03ad5ad12b9d1597e00e23c3dd"
+    },
     "plyr": {
       "Package": "plyr",
       "Version": "1.8.9",
@@ -1748,6 +1860,22 @@
         "prettyunits"
       ],
       "Hash": "f4625e061cb2865f111b47ff163a5ca6"
+    },
+    "promises": {
+      "Package": "promises",
+      "Version": "1.2.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R6",
+        "Rcpp",
+        "fastmap",
+        "later",
+        "magrittr",
+        "rlang",
+        "stats"
+      ],
+      "Hash": "0d8a15c9d000970ada1ab21405387dee"
     },
     "proxy": {
       "Package": "proxy",

@@ -1,0 +1,246 @@
+---
+title: "Results of the agent based model simulating plankton displacement"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+source("utils_ab_model.R")
+```
+
+## Load data
+
+```{r load}
+load("data/simulation_results.Rdata")
+```
+
+## Model parameters
+
+Let’s familiarise ourselves with model parameters:
+
+-   `h`: the bandwidth for computing density
+
+-   `d_length`: the displacement length of organisms (in px)
+
+-   `mv_prop`: the proportion of motile organisms (this one is straightforward)
+
+Let’s take just one image as an example and see the effect of both `h` and `d_length`.
+
+```{r gen_image}
+#| fig-column: body-outset
+#| out-width: 100%
+
+set.seed(seed)
+# Generate an image with organisms in 3D and plot it in 2D
+df <- tibble(
+    x = round(runif(n = 15, min = 1, max = vol$x)),
+    y = round(runif(n = 15, min = 1, max = vol$y)),
+    z = round(runif(n = 15, min = 1, max = vol$z))
+  ) %>% # Add information for img name
+    mutate(
+      img_name = "img_001",
+      id = paste0(str_pad(row_number(), 3, pad = "0"))
+    )
+
+ggplot(df) +
+  geom_point(aes(x, y, colour = z)) +
+  scale_colour_viridis_c() +
+  coord_fixed()
+```
+
+### Density bandwidth
+
+Let’s compute density with various bandwidth values and plot results.
+
+```{r dens_bandwidth}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# List of bandwidth values to try
+h_values <- c(10000, 50000, 100000, 500000)
+
+# Empty list to store plots
+plots <- list()
+
+# Compute density for each bandwidth
+lapply(1:length(h_values), function(i){
+  
+  # Get bandwidth value
+  h <- h_values[i]
+  
+  # Compute density
+  dens_3d <- calculate_density_3d(df, h = h, vol = vol)
+  
+  # Extract results
+  dens_to_plot <- dens_3d$eval.points %>% 
+    as_tibble() %>% 
+    mutate(dens = dens_3d$estimate) %>% 
+    group_by(x, y) %>% 
+    summarise(dens = mean(dens), .groups = "drop") %>% 
+    mutate(h = h)
+  
+  # Plot results and store plot
+  plots[[i]] <- ggplot(dens_to_plot) +
+    geom_raster(aes(x, y, fill = dens)) +
+    geom_point(data = df, aes(x, y), size = 0.5) +
+    scale_fill_distiller(palette = "Blues", direction = 1) +
+    facet_wrap(~h, ncol = 1, labeller = labeller(.rows = label_both)) +
+    coord_fixed()
+})
+```
+
+Sane values are between `100000` and `400000`.
+
+### Displacement length
+
+```{r d_length}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# List of displacement values to try (in px)
+d_length_values <- c(50, 100, 300, 500)
+(d_length_values * 51)/10000 # to see equivalent in cm
+
+# Generate random gradients in x, y and z directions for each point
+gradient_values <- tibble(
+    dx = round(runif(n = 15, min = 0, max = 1)),
+    dy = round(runif(n = 15, min = 0, max = 1)),
+    dz = round(runif(n = 15, min = 0, max = 1))
+  )
+
+new_pts <- lapply(d_length_values, function(d_length) {
+  # Move points
+  new_df <- move_points(df, gradient_values = gradient_values, d_length = d_length)
+  
+  # Store d_length
+  new_df <- new_df %>% mutate(d_length = d_length)
+}) %>% 
+  bind_rows()
+
+# Store updated points with original points
+all_pts <- crossing( # generate all combinations between d_length_values and original points
+  df,
+  d_length = d_length_values
+) %>% 
+  mutate(when = "before") %>% # flag as before 
+  bind_rows( # bind with updated points
+    new_pts %>% mutate(when = "after") # flagged as after
+  ) %>% 
+  mutate(when = factor(when, levels = c("before", "after")))
+
+ggplot(all_pts) +
+  geom_point(aes(x, y, colour = when), size = 0.5) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  facet_wrap(~d_length, ncol = 1, labeller = labeller(.rows = label_both)) +
+  coord_fixed()
+```
+
+Let’s stay between `100` and `400` px.
+
+## Model results
+
+First, we only keep distances smaller than the threshold.
+
+```{r filter}
+# Discard distances below threshold
+sim_res <- sim_res %>% filter(dist < dist_thr_cm)
+```
+
+Plot distances before and after for various parameters.
+
+```{r plot_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-height: 8
+## Plot distances
+p1 <- ggplot(sim_res %>% filter(prop_mv == 1)) +
+  geom_density(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 100%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p2 <- ggplot(sim_res %>% filter(prop_mv == 0.8)) +
+  geom_density(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 80%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p1 / p2 + plot_layout(guides = "collect")
+```
+
+Same for ECDF.
+
+```{r plot_ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-height: 8
+p3 <- ggplot(sim_res %>% filter(prop_mv == 1)) +
+  stat_ecdf(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 100%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p4 <- ggplot(sim_res %>% filter(prop_mv == 0.8)) +
+  stat_ecdf(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When", title = "prop_mv: 80%") +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+p3 / p4 + plot_layout(guides = "collect")
+```
+
+## Compare model with observations
+
+```{r compare}
+#| fig-column: body-outset
+#| out-width: 100%
+
+load("data/03.all_distances.Rdata")
+
+# Get quantiles and reshape data
+df_all_dist <- df_all %>% 
+  select(dist, dist_rand) %>% 
+  unnest(c(dist, dist_rand)) %>% 
+  pivot_longer(dist:dist_rand, names_to = "type", values_to = "dist") %>% 
+  mutate(type = ifelse(type == "dist", "plankton", "null")) %>% 
+  mutate(dist = dist * 51 / 10000) %>% # from px to cm
+  filter(dist < dist_thr_cm) %>% # keep only distances below threshold
+  mutate(from = "Obs")
+
+# The parameter set we want
+param_set <- list(
+  d_length = 100,
+  h = 250000,
+  prop_mv = 0.8
+)
+
+# Get corresponding model simulation
+one_sim_res <- sim_res %>% 
+  # Keep only results for this parameter set
+  filter(
+    d_length == param_set$d_length & 
+    h == param_set$h & 
+    prop_mv == param_set$prop_mv
+  ) %>% 
+  select(type = when, dist) %>% 
+  mutate(type = ifelse(type == "before", "null", "plankton")) %>% 
+  mutate(from = "Model")
+
+# Assemble and plot
+ggplot(bind_rows(df_all_dist, one_sim_res)) +
+  geom_density(aes(x = dist, colour = type, linetype = from)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type", linetype = "From")
+```

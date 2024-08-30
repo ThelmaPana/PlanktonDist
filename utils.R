@@ -8,6 +8,7 @@ library(pbmcapply)
 library(hms)
 library(ecotaxarapi)
 library(unix)
+library(castr)
 
 
 # Null hypothesis
@@ -38,7 +39,7 @@ theme_set(theme_minimal())
 
 ## Subsampling ----
 #--------------------------------------------------------------------------#
-sub_sample <- TRUE # whether to subsample or not
+sub_sample <- FALSE # whether to subsample or not
 n_img <- 10000 # number of images to consider for subsampling
 n_dist <- 10000 # number of distances to retain for comparisons
 
@@ -48,28 +49,15 @@ n_dist <- 10000 # number of distances to retain for comparisons
 # Minimum number of distances to include a group/pair in analyses
 n_dist_min <- 10000 
 
-# Load ESD for taxonomic groups
-load("data/plankton_esd.Rdata")
+# Distance threshold
+# NB: computed at step 3
+dist_thr <- 11 # in cm
 
-# Method for thresholding distances (constant or proportional to ESD)
-thres_met <- "constant"
-dist_thr_cm <- 10 # in cm
 
-#thres_met <- "esd"
-#k <- 50 # ESD to distance factor
-
-if (thres_met == "esd") { # proportional to ESD
-  # Compute distance threshold based on k and median ESD for each taxon
-  plankton_esd <- plankton_esd %>% 
-    mutate(dist_thr = med_esd * k) %>% 
-    select(-med_esd) 
-  
-} else if (thres_met == "constant") { # constant for all taxonomic groups
-  # Use the threshold for all taxa
-  plankton_esd <- plankton_esd %>% 
-    select(taxon) %>% 
-    mutate(dist_thr = dist_thr_cm)
-}
+## Quantiles probabilities ----
+#--------------------------------------------------------------------------#
+# Prepare probabilities for 10000-quantiles
+probs <- seq(0, 1, length.out = 10000)
 
 
 ## Image volume ----
