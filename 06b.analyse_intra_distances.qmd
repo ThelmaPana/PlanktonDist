@@ -195,7 +195,14 @@ ggplot(ecdfs_intra) +
   facet_wrap(~taxon, scales = "free", ncol = 3)
 ```
 
-For nearly all taxonomic groups, plankton ECDF is above null  ECDF, indicating more short distances, i.e. planktonic organisms are closer than expected.
+For nearly all taxonomic groups, plankton ECDF is above null  ECDF, indicating more short distances, i.e. planktonic organisms are closer than expected. Let’s automate the computation and store it.
+
+```{r ecdfs_intra_summary}
+ecdfs_intra_summ <- ecdfs_intra %>% 
+  group_by(taxon) %>% 
+  summarise(mean_diff = mean(diff)) %>% 
+  mutate(dir = ifelse(mean_diff > 0, "closer", "further"))
+```
 
 Let’s now compute the interaction strength and confidence for each taxon.
 
@@ -224,7 +231,9 @@ df_intra_scores <- df_intra %>%
     sigma = (ymax - ymin) / (2 * 1.645),
     # compute z-score
     z_score = (log_kuiper_stat - ymean)/sigma
-  )
+  ) %>% 
+  # add intercation direction
+  left_join(ecdfs_intra_summ, by = join_by(taxon))
 
 # Plot Z-score
 ggplot() +

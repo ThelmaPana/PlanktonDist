@@ -54,7 +54,9 @@ For each taxonomic group, we:
 -   perform Kuiper test
 
 ```{r fine_thr_taxa}
-inter_thr <- lapply(saved[1:50], function(file_name) {
+saved_sub <- sample(saved, size = 100)
+
+inter_thr <- lapply(saved_sub, function(file_name) {
   # Get taxon for given file
   my_pair <- str_split_fixed(file_name, "_", n = 3)[,3] %>% str_remove_all(".parquet")  
   message(my_pair)
