@@ -24,9 +24,9 @@ Read saved scores for both intra and inter distances and keep only relevant colu
 
 ```{r load}
 # Intra scores
-load("data/04c.df_intra_scores_small.Rdata")
+load("data/06b.df_intra_scores.Rdata")
 # Inter scores
-load("data/05c.df_inter_scores_small.Rdata")
+load("data/06c.df_inter_scores.Rdata")
 ```
 
 Assemble intra and inter scores.
@@ -34,12 +34,12 @@ Assemble intra and inter scores.
 ```{r assemble}
 # Intra
 df_intra_mat <- df_intra_scores %>% 
-  select(t1 = taxon, t2 = taxon, test_stat, z_score, dir, above)
+  select(t1 = taxon, t2 = taxon, kuiper_stat, z_score, dir, sig)
 
 # Inter
 df_inter_mat <- df_inter_scores %>% 
-  select(pair, test_stat, z_score, dir, above) %>% 
-  separate_wider_delim(pair, delim = " - ", names = c("t1", "t2"))
+  select(pair, kuiper_stat, z_score, dir, sig) %>% 
+  separate_wider_delim(pair, delim = "-", names = c("t1", "t2"))
 # and generate reverse of t1 / t2
 df_inter_mat_bis <- df_inter_mat %>% rename(t2 = t1, t1 = t2)
 
@@ -58,11 +58,11 @@ df_pairs <- df_intra_mat %>%
 # Create all combination of taxa and join scores
 taxa <- sort(unique(df_pairs$t1))
 df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
-  left_join(df_pairs %>% filter(above), by = join_by(t1, t2))
+  left_join(df_pairs %>% filter(sig), by = join_by(t1, t2))
 
 # Plot Kuiper stat and Z-score
 ggplot(df_mat) +
-  geom_raster(aes(x = t1, y = t2, fill = test_stat, alpha = z_score)) +
+  geom_raster(aes(x = t1, y = t2, fill = kuiper_stat, alpha = z_score)) +
   scale_fill_viridis_c(na.value = NA) +
   labs(fill = "Kuiper\nstatistic", alpha = "Z-score") +
   theme_classic() +
@@ -72,6 +72,13 @@ ggplot(df_mat) +
     axis.title.y = element_blank()
   ) + 
   coord_fixed()
+```
+
+This time let’s plot the matrix with the direction of the interaction.
+
+```{r mat_dir}
+#| fig-column: body-outset
+#| out-width: 100%
 
 # Plot direction and Z-score
 ggplot(df_mat) +
@@ -85,5 +92,4 @@ ggplot(df_mat) +
     axis.title.y = element_blank()
   ) + 
   coord_fixed()
-
 ```
