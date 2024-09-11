@@ -1,0 +1,229 @@
+---
+title: "Investigate day VS night differences for all distances."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: false
+  freeze: false
+---
+
+```{r set_up}
+#|cache: false
+source("utils.R")
+```
+
+## Read data
+
+First, we need to read:
+
+-   overall plankton and null distances
+
+-   images information (for day/night periods)
+
+-   Kuiper stats for null dataset
+
+```{r read}
+#|cache.lazy: false
+# Distances
+plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+rand_dist <- read_parquet("data/distances/02a.all_distances_random.parquet")
+
+# Images
+plank_img <- read_parquet("data/00.images_clean.parquet")
+
+# Null KS
+load("data/04b.null_ks.Rdata")
+```
+
+Define a nice colour palette.
+
+```{r colours}
+cols <- c(
+  "dawn" = "#fc8d62", 
+  "day" = "#80b1d3", 
+  "dusk" = "#df65b0", 
+  "night" = "#022660",
+  "all" = "grey"
+)
+```
+
+Let’s start by assembling plankton and null distances, as well as image information containing time period. Then, group split by time period.
+
+```{r assemble_split}
+all_dist <- bind_cols( # Join plankton and null distances
+  plank_dist %>% select(plank_img_name = img_name, plank_dist = dist),
+  rand_dist %>% select(rand_img_name = img_name, rand_dist = dist)
+) %>% # Join with image information
+  left_join(plank_img %>% select(plank_img_name = img_name, period), by = join_by(plank_img_name))
+
+all_dist_gr <- all_dist %>% 
+  group_by(period) %>% 
+  group_split()
+```
+
+## Process time periods
+
+For each time period, we:
+
+-   extract distances
+-   apply threshold
+-   compute quantiles
+-   compute Kuiper statistic
+
+```{r process}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Loop over periods
+df_period <- lapply(all_dist_gr, function(el) {
+  # Get plankton distances and random distances
+  # Apply distance threshold
+  pl <- el %>% select(plank_dist) %>% filter(plank_dist < dist_thr)
+  rd <- el %>% select(rand_dist) %>% filter(rand_dist < dist_thr)
+  
+  # Get quantiles
+  plank_qt <- quantile(pl$plank_dist, probs = probs, names = FALSE)
+  rand_qt <- quantile(rd$rand_dist, probs = probs, names = FALSE)
+  
+  # Perform Kuiper test
+  kt <- kuiper_stat(plank_qt, rand_qt)
+  kt
+  
+  # Return results in a tibble
+  res <- tibble(
+    period = el$period[1], # time period (day, night…)
+    n_dist_plank = nrow(pl),
+    n_dist_rand = nrow(rd),
+    n_dist = (n_dist_plank + n_dist_rand) / 2,
+    kuiper_stat = kt,
+    plank_qt = list(plank_qt),
+    rand_qt = list(rand_qt)
+  )
+  return(res)
+  
+}) %>% 
+  bind_rows()
+rm(all_dist_gr) # for memory
+
+# Apply log-transformation to number of distances and Kuiper statistic
+df_period <- df_period %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+
+# Plot Kuiper stat VS number of distances
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray") +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_period, aes(x = log_n_dist, y = log_kuiper_stat, colour = period)) +
+  scale_colour_manual(values = cols) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Period") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+It seems that there is a difference between day and night for all distances.
+
+## ECDFs
+
+Let’s now have a look at distributions and ECDFs.
+
+```{r comp_ecdfs}
+# X axis to compute ECDF on
+x_axis_seq <- seq(0, dist_thr, length.out = 1000)
+
+# Loop over periods
+ecdfs_period <- lapply(1:nrow(df_period), function(i){
+  # Get row of interest
+  r <- df_period %>% slice(i)
+  
+  r$plank_qt
+  # Compute ECDF
+  plank_ecdf <- ecdf(unlist(r$plank_qt))(x_axis_seq)
+  null_ecdf <- ecdf(unlist(r$rand_qt))(x_axis_seq)
+  
+  # Return results in a tibble
+  res <- tibble(
+    period = r$period,
+    x_axis_seq = x_axis_seq,
+    plank_ecdf = plank_ecdf,
+    null_ecdf = null_ecdf,
+    diff = plank_ecdf - null_ecdf
+  )
+  return(res)
+}) %>% 
+  bind_rows()
+
+```
+
+Let’s plot all ECDFs.
+
+```{r plot_all_ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot all ECDFs
+ggplot(ecdfs_period) +
+  geom_path(aes(x = x_axis_seq, y = plank_ecdf, colour = period)) +
+  scale_colour_manual(values = cols)  +
+  labs(x = "Distance (cm)", y = "Plankton ECDF", colour = "Period") +
+  theme_classic()
+```
+
+No obvious difference here, let’s have a look at differences between plankton ECDF and null ECDF.
+
+```{r plot_ecdf_diffs}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot all ECDFs differences
+ggplot(ecdfs_period) +
+  geom_path(aes(x = x_axis_seq, y = diff, colour = period)) +
+  scale_colour_manual(values = cols)  +
+  labs(x = "Distance (cm)", y = "Plankton ECDF - Null ECDF", colour = "Period") +
+  theme_classic()
+```
+
+Let’s now focus on the day / night difference:  compute and plot the difference between day plankton ECDF and night plankton ECDF.
+
+```{r plot_ecdf_diff_dn}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot day plankton ECDF - night plankton ECDF
+ecdfs_period %>% 
+  select(period, x_axis_seq, plank_ecdf) %>% 
+  filter(period %in% c("day", "night")) %>% 
+  pivot_wider(names_from = period, values_from = plank_ecdf) %>% 
+  mutate(diff_dn = day - night) %>% 
+  ggplot() +
+  geom_path(aes(x = x_axis_seq, y = diff_dn)) +
+  labs(x = "Distance (cm)", y = "Day plankton ECDF - Night plankton ECDF") +
+  theme_classic()
+```
+
+We see that day plankton ECDF \> night plankton ECDF, i.e. day distances are shorter than night distances. Let’s check this by plotting distributions.
+
+```{r plot_dist_dn}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot distributions for day and night
+df_period %>% 
+  select(period, plank_qt) %>% 
+  filter(period %in% c("day", "night")) %>% 
+  unnest(plank_qt) %>% 
+  ggplot() +
+  geom_density(aes(x = plank_qt, colour = period)) +
+  scale_colour_manual(values = cols) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Period") +
+  theme_classic()
+```
