@@ -63,11 +63,13 @@ df_mat <- crossing(t1 = taxa, t2 = taxa) %>%
 # Plot Kuiper stat and Z-score
 ggplot(df_mat) +
   geom_raster(aes(x = t1, y = t2, fill = kuiper_stat, alpha = z_score)) +
+  geom_text(data = df_mat %>% filter(dir == "further"), aes(x = t1, y = t2), label = "×") +
   scale_fill_viridis_c(na.value = NA) +
   labs(fill = "Kuiper\nstatistic", alpha = "Z-score") +
   theme_classic() +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    axis.text.y = element_text(size = 7),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
   ) + 
