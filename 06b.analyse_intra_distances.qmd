@@ -138,7 +138,7 @@ Let’s plot ECDF.
 ggplot(df_intra_dist) +
   stat_ecdf(aes(x = dist, colour = type)) +
   scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
-  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  labs(x = "Distance (cm)", y = "ECDF", colour = "Type") +
   theme_classic() +
   theme(strip.background = element_rect(colour = "white")) +
   facet_wrap(~taxon, scales = "free", ncol = 3)
