@@ -65,6 +65,8 @@ Start by plotting distribution of distances
 ```{r plot_dist}
 #| fig-column: body-outset
 #| out-width: 100%
+#| fig-height: 3
+#| fig-width: 6
 df_all_dist <- df_all_dist %>% 
   pivot_longer(plank:rand, names_to = "type", values_to = "dist") %>% 
   mutate(
@@ -84,6 +86,8 @@ Let’s plot ECDF.
 ```{r plot_ecdf}
 #| fig-column: body-outset
 #| out-width: 100%
+#| fig-height: 3
+#| fig-width: 6
 ggplot(df_all_dist) +
   stat_ecdf(aes(x = dist, colour = type)) +
   scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
