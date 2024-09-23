@@ -58,6 +58,9 @@ df_inter <- df_inter %>%
   summarise_all(mean) %>% 
   rename(pair = pair_unsrt)
 
+# Keep only cases for which we have enough distances
+df_inter <- df_inter %>% filter(n_dist > n_dist_min)
+
 # Identify taxa above the threshold and that have enough distances
 # First, get slope and intercept of the 0.95 qt regression
 intercept <- null_ks_rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
@@ -109,7 +112,7 @@ Only those differing from random.
 ggplot() +
   geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  #geom_point(data = df_inter %>% filter(!sig), aes(x = log_n_dist, y = log_kuiper_stat), colour = "grey") +
+  geom_point(data = df_inter %>% filter(!sig), aes(x = log_n_dist, y = log_kuiper_stat), colour = "grey") +
   geom_point(data = df_inter_sig, aes(x = log_n_dist, y = log_kuiper_stat, colour = pair, fill = pair, shape = pair), show.legend = FALSE) +
   labs(x = "N distances", y = "Kuiper statistic") +
   scale_fill_manual(values = df_inter_sig$colour) +
@@ -223,12 +226,15 @@ ecdfs_inter_summ <- ecdfs_inter %>%
   mutate(dir = ifelse(mean_diff > 0, "closer", "further"))
 ggplot(ecdfs_inter_summ) + 
   geom_vline(xintercept = 0, colour = "grey80", linewidth = 2) +
-  geom_density(aes(x = mean_diff))
+  geom_density(aes(x = mean_diff)) +
+  labs(x = "Mean of plankton EDCF - null ECDF", y = "Density")
 ```
 
 For nearly all pairs groups, plankton ECDF is above null  ECDF, indicating more short distances, i.e. planktonic organisms are closer than expected. Let’s check pairs for which distances are longer than expected.
 
 ```{r pairs_further}
+#| fig-height: 3
+#| fig-width: 8
 # Detect pairs for which ECDFs differences is negative
 pairs_further <- ecdfs_inter_summ %>% filter(mean_diff < 0)
 
