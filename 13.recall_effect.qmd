@@ -1,5 +1,6 @@
 ---
 title: "Effect of recall on distribution of distances."
+subtitle: "Apply various recall values to organisms and check how it affects the distribution of distances."
 author: "Thelma Panaïotis"
 format: 
   html:
@@ -15,11 +16,212 @@ execute:
 
 Let’s use the agent-based model positions that are representative of plankton position and arbitrary remove some points to simulate lower recall, recompute distances and check if they are representative of overall distances.
 
+Let’s use data from the simulation to learn the relationship between points recall and distance recall.
+
 ```{r set_up}
 #|cache: false
 source("utils.R")
 ```
 
-```{r}
-load("data/simulation_results.Rdata")
+## Load data
+
+```{r load}
+# Subsample of images
+load("data/00.images_sub.Rdata")
+
+# Load all distances, plankton and random
+plankton_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+rand_dist <- read_parquet("data/distances/02a.all_distances_random.parquet")
+
+# Keep only distances below distance threshold
+plankton_dist <- plankton_dist %>% filter(dist < dist_thr)
+rand_dist <- rand_dist %>% filter(dist < dist_thr)
+
+# Generate a subsample of distances from the subsample of images
+plankton_dist_sub <- plankton_dist %>% filter(img_name %in% images_sub$img_name)
+
+# Null dataset
+load("data/04b.null_ks.Rdata")
+
+```
+
+## Learn distance recall from points recall
+
+The recall values from classification are for points. We can retrieve the recall of distances from points but this is costly in terms of computation. Instead, we can learn this relationship on a subset of distances and then apply it to the whole dataset.
+
+Because we are going to apply the recall values to the points and not the distances, we first need to generate a list of points.
+
+```{r get points}
+points <- plankton_dist_sub %>% 
+  select(img_name, p1, p2) %>% 
+  pivot_longer(p1:p2, values_to = "point", names_to = NULL) %>% 
+  distinct() %>% 
+  arrange(img_name, point)
+```
+
+For each recall value, we:
+
+-   drop points (randomly)
+
+-   get distances between remaining points
+
+```{r process}
+# Recall values to try
+recall_values <- seq(0.1, 1, by = 0.1)
+
+rec_val <- recall_values[1]
+
+# Loop over recall values
+bar <- lapply(recall_values, function(rec_val) {
+  print(rec_val)  
+  
+  # Subsample points (i.e. apply recall)
+  points_sub <- points %>% 
+    slice_sample(prop = rec_val) %>% 
+    arrange(img_name, point)
+  
+  # Get all combinations of remaining points
+  cross_sub <- points_sub %>% 
+    rename(p1 = point) %>% 
+    mutate(p2 = p1) %>% 
+    group_by(img_name) %>% 
+    expand(p1, p2) %>% 
+    ungroup() %>% 
+    filter(p1 != p2)
+  
+  # Let’s find distances between these points
+  dist_sub <- cross_sub %>% 
+    left_join(plankton_dist_sub, by = join_by(img_name, p1, p2)) %>% 
+    drop_na(dist) %>% 
+    mutate(rec_val = rec_val)
+  
+  # Return
+  return(dist_sub)
+}) %>% 
+  bind_rows()
+```
+
+Let’s check how the distance recall varies with points recall.
+
+```{r plot_dist_point_recall}
+# Compute number and proportion of retained distances
+baz <- bar %>% 
+  count(rec_val, name = "n_dist") %>% 
+  mutate(prop_dist = n_dist / max(n_dist))
+
+ggplot(baz) +
+  geom_path(aes(x = rec_val, y = prop_dist)) + 
+  geom_abline(slope = 1, intercept = 0, colour = "grey") +
+  xlim(0, 1) + ylim(0, 1) +
+  labs(x = "Points recall", y = "Distance recall") +
+  ggtitle("Distances recall VS points recall") +
+  theme_classic()
+```
+
+This means that if point recall is 0.5, distance recall is \~0.25.
+
+Let’s apply these distance recall values to our dataset of observations.
+
+## Apply to observations
+
+Similarly as before, for each recall value, we:
+
+-   subsample distances, both plankton and null distances
+
+-   compute Kuiper statistic between plankton and null distances
+
+```{r process}
+# Loop over recall values
+rec_dist <- lapply(1:nrow(baz), function(i) {
+  print(i)
+  # Get row
+  r <- baz %>% slice(i)
+  
+  # Subsample plankton distances
+  s_plankton_dist <- plankton_dist %>% slice_sample(prop = r$prop_dist)
+  
+  # Subsample random distances
+  s_rand_dist <- rand_dist %>% slice_sample(prop = r$prop_dist)
+  
+  # Compute quantiles
+  plank_dist_qt <- quantile(s_plankton_dist$dist, probs = probs, names = FALSE)
+  rand_dist_qt <- quantile(s_rand_dist$dist, probs = probs, names = FALSE)
+  
+  # Compute Kuiper statistic
+  ks <- kuiper_stat(plank_dist_qt, rand_dist_qt)
+  
+  # Format results
+  res <- tibble(
+    rec_val = r$rec_val,
+    n_dist_plank = nrow(s_plankton_dist),
+    n_dist_rand = nrow(s_rand_dist),
+    n_dist = (n_dist_plank + n_dist_rand) / 2,
+    kuiper_stat = ks,
+    plank_qt = list(plank_dist_qt),
+    rand_qt = list(rand_dist_qt)
+  )
+  
+  # Return
+  return(res)
+}) %>% 
+  bind_rows()
+
+# Log transform kuiper stat and number of distances
+rec_dist <- rec_dist %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+
+```
+
+And finally plot Kuiper stat VS number of distances.
+
+```{r plot}
+#| fig-column: body-outset
+#| out-width: 100%
+# Plot Kuiper stat VS number of distances
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = rec_dist, aes(x = log_n_dist, y = log_kuiper_stat, colour = rec_val)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Points\nrecall") +
+  scale_colour_viridis_c() +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+::: callout-note
+The KS value is barely affected by recall. Given the number of observations, it’s fine!
+:::
+
+## Look at recall values in the dataset
+
+```{r recall_obs}
+# Read table of clean taxa with match-up for report taxonomy
+clean_taxa <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE) %>% select(taxon = orig_name, new_taxon = new_name, report_taxon = report_name)
+
+# Read classification report
+rep_obs <- read_csv("data/raw/classif_report_aft_thres.csv", show_col_types = FALSE) %>% 
+  select(report_taxon = class, recall, precision)
+
+# Join clean taxon and classification report
+rep_obs <- clean_taxa %>% 
+  left_join(rep_obs, by = join_by(report_taxon)) %>% 
+  drop_na(new_taxon) %>% # drop unwanted taxa
+  select(taxon = new_taxon, recall, precision) %>% # keep only relevent columns
+  distinct() %>% # drop duplicates
+  filter(!str_detect(taxon, "colonial")) # drop colonial Collodaria
+
+# Plot recall per taxon
+rep_obs %>% 
+  arrange(recall) %>% 
+  mutate(taxon = fct_inorder(taxon)) %>% 
+  ggplot() +
+  geom_col(aes(y = taxon, x = recall)) +
+  scale_x_continuous(expand = c(0,0), limits = c(0, 1)) +
+  labs(x = "Recall", y = "Taxon") +
+  theme_classic()
+
 ```
