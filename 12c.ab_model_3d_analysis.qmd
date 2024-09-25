@@ -1,0 +1,358 @@
+---
+title: "Results of the agent based model simulating plankton displacement"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: false
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+source("utils_ab_model.R")
+```
+
+## Load data
+
+```{r load}
+# Simulation results
+sim_res <- read_parquet("data/12b.simulation_results.parquet")
+
+# Kuiper stat for null dataset
+load("data/04b.null_ks.Rdata")
+```
+
+## Checks for null distances
+
+### Compare null of each parameter set
+
+```{r compare_null_mod}
+#| fig-column: body-outset
+#| out-width: 100%
+# Extract distances before displacement, i.e. null distances
+sim_res_null <- sim_res %>% filter(when == "before") %>% select(-c(p1, p2, prop_mv))
+
+# Extract quantiles for each parameter set
+sim_res_null_qt <- sim_res_null %>% 
+  group_by(d_length, h) %>% 
+  summarise(dist_qt = list(quantile(dist, probs = probs, names = FALSE))) %>% 
+  ungroup() %>% 
+  mutate(param_set = row_number() %>% as.factor())
+
+ggplot(sim_res_null_qt %>% unnest(dist_qt)) + 
+  geom_density(aes(x = dist_qt, colour = param_set), alpha = 0.2) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Param\nset") +
+  theme_classic()
+```
+
+::: callout-note
+This is expected as all models use the same original points.
+:::
+
+### Compare observations null and model null
+
+There are much more observation null distances (\>10⁸) than modeled null distances (\~300,000). Perform the comparison with:
+
+-   quantiles computed from all distances
+
+-   quantiles computed from a random subsample of size 300,000 of all distances
+
+```{r compare_null_mod_obs}
+#| fig-column: body-outset
+#| out-width: 100%
+# Read null distances
+rand_dist <- read_parquet("data/distances/02a.all_distances_random.parquet") %>% 
+  filter(dist < dist_thr) # filter distances using threshold
+
+# Without subsampling
+rand_dist_qt <- rand_dist %>% 
+  reframe(dist_qt = quantile(dist, probs = probs, names = FALSE))
+
+
+# Subsample
+rand_dist_sub_qt <- rand_dist %>% 
+  slice_sample(n = 300000) %>% 
+  reframe(dist_qt = quantile(dist, probs = probs, names = FALSE))
+
+# Plot quantiles from all distances and from subsampled null distances
+bind_rows(
+  tibble(dist_qt = rand_dist_qt$dist_qt, subsample = FALSE),
+  tibble(dist_qt = rand_dist_sub_qt$dist_qt, subsample = TRUE)
+) %>% 
+  ggplot() +
+  geom_density(aes(x = dist_qt, colour = subsample)) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Subsample") +
+  ggtitle("Quantiles from all distances VS a subsample of 300,000 null distances") +
+  theme_classic()
+
+# Plot modelled null distances (n = 300,000) VS a subsample of 300,000 null distances
+sim_res_null_qt %>% 
+  slice(1) %>% 
+  unnest(dist_qt) %>% 
+  mutate(what = "model") %>% 
+  select(dist_qt, what) %>% 
+  bind_rows(rand_dist_sub_qt %>% mutate(what = "obs")) %>% 
+  ggplot() +
+  geom_density(aes(x = dist_qt, colour = what)) +
+  labs(x = "Distance (cm)", y = "Density", colour = "What") +
+  ggtitle("Modelled null distances (n = 300,000) VS a subsample of 300,000 null distances") +
+  theme_classic()
+```
+
+There is some differences between modeled null (n = 300,000) distances and a subsample of 300,000 null distances. This is likely because of the low number of modeled distances. Let’s check if there is variation between various subsamples of 300,000 null distances.
+
+```{r rand_chunks}
+#| fig-column: body-outset
+#| out-width: 100%
+rand_dist %>% 
+  # generate chunks of 300,000 distances
+  mutate(chunk = rep(1:440, each = 300000)[1:nrow(.)]) %>% 
+  # randomly select 10 of them
+  filter(chunk %in% round(runif(n = 10, min = 1, max = 440))) %>% 
+  mutate(chunk = as.factor(chunk)) %>% # chunk as factor
+  ggplot() +
+  geom_density(aes(x = dist, colour = chunk)) + 
+  labs(x = "Distance (cm)", y = "Density", colour = "Chunk") +
+  ggtitle("Comparison between subsamples of 300,000 null distances") +
+  theme_classic()
+```
+
+Indeed, there is variation introduced by subsampling.
+
+::: callout-important
+What do we do?
+:::
+
+## Model results
+
+### Process model results
+
+For each set of parameters, extract 10000 quantiles and compute Kuiper stat.
+
+```{r process_sim_res}
+# Split dataframe by set of parameters
+sim_res_gr <- sim_res %>% 
+  select(-c(p1, p2)) %>% 
+  group_by(d_length, prop_mv, h) %>% 
+  group_split()
+
+# Loop over sets of parameters
+sim_res_ks <- lapply(sim_res_gr, function(el) {
+  # Exract distances
+  dist_after <- el %>% filter(when == "after") %>% pull(dist)
+  dist_before <- el %>% filter(when == "before") %>% pull(dist)
+  n_dist_after <- length(dist_after)
+  n_dist_before <- length(dist_before)
+  
+  # Extract quantiles if needed
+  if (length(dist_after) > 10000) {
+    dist_after <- quantile(dist_after, probs = probs, names = FALSE)
+  }
+  if (length(dist_before) > 10000) {
+    dist_before <- quantile(dist_before, probs = probs, names = FALSE)
+  }
+  
+  # Compute Kuiper stat
+  kt <- kuiper_stat(dist_before, dist_after)
+  
+  # Format results
+  res <- tibble(
+    d_length = el$d_length[1], # displacement length
+    prop_mv = el$prop_mv[1], # proportion of motile organisms
+    h = el$h[1], # density sensitivity
+    n_dist_after = n_dist_after, # Number of distances after
+    n_dist_before = n_dist_before, # Number of distances before
+    n_dist = (n_dist_after + n_dist_before) / 2, # Averaged number of distances
+    kuiper_stat = kt, # Kuiper statistic
+    dist_before_qt = list(dist_before), # quantiles for distances before
+    dist_after_qt = list(dist_after) # quantiles for distances after
+  )
+  return(res)
+}) %>% 
+  bind_rows()
+
+# Keep one table with distances
+sim_res_dist <- sim_res_ks %>% 
+  select(d_length, prop_mv, h, dist_before_qt, dist_after_qt) %>% 
+  unnest(c(dist_before_qt, dist_after_qt)) %>% 
+  pivot_longer(dist_before_qt:dist_after_qt, names_to = "when", values_to = "dist") %>% 
+  mutate(when = ifelse(str_detect(when, "before"), "before", "after"))
+
+# And one without distances
+sim_res_ks <- sim_res_ks %>% 
+  select(-c(dist_before_qt, dist_after_qt)) %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+```
+
+### Distances for each parameter set
+
+Let’s now have a look at the model results for the different set of parameters.
+
+```{r plot_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-height: 5
+## Plot distances
+ggplot(sim_res_dist) +
+  geom_density(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When") +
+  theme_classic() +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+
+```
+
+Let’s also plot ECDFs.
+
+```{r plot_ecdf}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig-height: 5
+ggplot(sim_res_dist) +
+  stat_ecdf(aes(x = dist, colour = when)) +
+  scale_colour_manual(values = c("#66c2a5", "#fc8d62")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "When") +
+  theme_classic() +
+  facet_grid(d_length~h, labeller = labeller(.rows = label_both, .cols = label_both))
+```
+
+We clearly see that the choice of parameter affects the distribution of distances after displacement. Let’s plot Kuiper statistic for each set of parameters.
+
+### Plot Kuiper statistic
+
+```{r plot_ks}
+#| fig-column: body-outset
+#| out-width: 100%
+sim_res_ks <- sim_res_ks %>% 
+  mutate(set = paste0("d_length: ", d_length, "; h: ", h) %>% as.factor()) # create one column for all parameters
+
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = sim_res_ks, aes(x = log_n_dist, y = log_kuiper_stat, colour = set)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Set") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+The Kuiper statistic does vary with the parameter set. Let’s now compare with observations.
+
+### Compare with observations
+
+First, we need to subsample observations to match the number of distances, and then compute Kuiper statistic.
+
+```{r comp_mod_obs}
+#| fig-column: body-outset
+#| out-width: 100%
+# Read plankton distances
+plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+
+# Filter distances using threshold
+plank_dist <- plank_dist %>% filter(dist < dist_thr)
+
+# Subsample: we want ~300000 distances to match the number of distances from the model. 
+plank_dist_sub <- plank_dist %>% slice_sample(n = 300000)
+rand_dist_sub <- rand_dist %>% slice_sample(n = 300000)
+
+# Get quantiles
+plank_qt <- quantile(plank_dist_sub$dist, probs = probs, names = FALSE)
+rand_qt <- quantile(rand_dist_sub$dist, probs = probs, names = FALSE)
+
+# Kuiper statistic
+ks <- kuiper_stat(plank_qt, rand_qt)
+
+# Store results
+obs_ks <- tibble(
+  n_dist_plank = nrow(plank_dist_sub),
+  n_dist_rand = nrow(rand_dist_sub),
+  n_dist = (nrow(plank_dist_sub) + nrow(rand_dist_sub)) / 2,
+  plank_qt = list(plank_qt),
+  rand_qt = list(rand_qt),
+  kuiper_stat = ks
+) %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  )
+
+# Plot observation Kuiper statistic with model KS
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = sim_res_ks, aes(x = log_n_dist, y = log_kuiper_stat)) +
+  geom_point(data = obs_ks, aes(x = log_n_dist, y = log_kuiper_stat), colour = "#00B2FF") +
+  labs(x = "N distances", y = "Kuiper statistic") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+
+```
+
+It seems that model parameters do cover the observations Kuiper statistic. Let’s find the best model.
+
+```{r plot_best_mod}
+#| fig-column: body-outset
+#| out-width: 100%
+# Identify parameter set with the closest KS to observations KS 
+sim_sel <- sim_res_ks %>% 
+  mutate(
+    obs_kuiper_stat = obs_ks$kuiper_stat,
+    diff_kuiper_stat = kuiper_stat - obs_kuiper_stat
+    ) %>% 
+  filter(diff_kuiper_stat == min(diff_kuiper_stat))
+
+# Get model distances corresponding to selected set of parameters
+mod_dist <- sim_sel %>% 
+  left_join(sim_res_dist, by = join_by(d_length, prop_mv, h)) %>% 
+  mutate(what = "model")
+
+# Observation distances
+obs_dist <- tibble(
+  what = "obs",
+  when = "before",
+  dist = rand_qt
+) %>% 
+  bind_rows(
+    tibble(
+      what = "obs",
+      when = "after",
+      dist = plank_qt
+    )
+  )
+
+# Bind together
+all_dist <- bind_rows(
+  mod_dist,
+  obs_dist
+)
+
+# Plot model and observations for before and after
+ggplot(all_dist) +
+  geom_density(aes(x = dist, colour = when, linetype = what)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"))+#, labels = c("Plankton", "Null")) +
+  scale_linetype_manual(values = c("dashed", "solid")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type", linetype = "From") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0.001), breaks = c(0, 0.05, 0.10)) +
+  theme_classic()
+```
+
+Selected parameters are:
+
+-   displacement length: `r sim_sel$d_length`
+
+-   density bandwidth: `r sim_sel$h`
+
+Ideally, continuous and dotted lines should be identical.

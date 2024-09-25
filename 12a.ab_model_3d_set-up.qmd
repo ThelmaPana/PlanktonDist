@@ -30,10 +30,6 @@ Let’s familiarise ourselves with model parameters:
 
 -   `mv_prop`: the proportion of motile organisms (this one is straightforward)
 
-::: callout-note
-In the ISIIS dataset, 96% of organisms are motile. The proportion of organisms with buoyancy control only is negligible.
-:::
-
 Let’s take just one image as an example and see the effect of both `h` and `d_length`.
 
 ```{r gen_image}
@@ -146,3 +142,18 @@ ggplot(all_pts) +
 ```
 
 Let’s stay between `100` and `400` px, i.e. between 0.5 and 2 cm.
+
+### Proportion of motile organisms
+
+This can be inferred from the dataset composition and the swimming ability of each taxonomic group.
+
+```{r motility}
+# Load motility + count for each taxon
+load("data/00.motility_counts.Rdata")
+motility_counts %>% 
+  group_by(motility) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(prop = n / sum(n))
+```
+
+Overall, 96% of organisms in the dataset are motile. The proportion with buoyancy control only is negligible.

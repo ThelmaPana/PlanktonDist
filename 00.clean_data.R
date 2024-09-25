@@ -84,3 +84,23 @@ plankton_sub <- plankton %>% filter(img_name %in% images_sub$img_name)
 # Save
 save(plankton_sub, file = "data/00.plankton_sub.Rdata")
 save(images_sub, file = "data/00.images_sub.Rdata")
+
+
+## Proportion of each motility type ----
+#--------------------------------------------------------------------------#
+# Read all plankton data
+plankton <- read_parquet("data/00.plankton_clean.parquet") 
+
+# Read motility for each taxon
+motility_types <- read_csv("data/raw/taxa_list.csv", show_col_types = FALSE) %>% 
+  select(taxon = new_name, motility) %>% 
+  drop_na() %>% 
+  arrange(taxon)
+
+# Compute proportion for each type of motility
+motility_counts <- plankton %>% 
+  count(taxon) %>% 
+  filter(taxon != "Collodaria_colonial") %>% # ignore colonial Collodaria
+  left_join(motility_types, by = join_by(taxon)) 
+
+save(motility_counts, file = "data/00.motility_counts.Rdata")
