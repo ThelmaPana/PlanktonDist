@@ -11,14 +11,65 @@
 source("utils.R")
 source("utils_ab_model.R")
 # All distances
-load("data/03c.all_distances_processed.Rdata")
+#load("data/03c.all_distances_processed.Rdata")
 # Intra distances
-load("data/04c.df_intra_scores_small.Rdata")
+#load("data/04c.df_intra_scores_small.Rdata")
 # Inter distances
-load("data/05c.df_inter_scores_small.Rdata")
+#load("data/05c.df_inter_scores_small.Rdata")
 # Simulation results
-load("data/simulation_results.Rdata")
+#load("data/simulation_results.Rdata")
 
+# All plankton distances
+plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+rand_dist <- read_parquet("data/distances/02a.all_distances_random.parquet")
+
+# Kuiper stats
+load("data/05a.all_distances_ks.Rdata")
+load("data/05b.intra_distances_ks.Rdata")
+load("data/05c.inter_distances_ks.Rdata")
+
+
+## Illustration of distribution of all distances ----
+#--------------------------------------------------------------------------#
+# Get quantiles
+plank_dist_qt <- quantile(plank_dist$dist, probs = probs, names = FALSE)
+
+ggplot() +
+  geom_density(aes(x = plank_dist_qt), colour = "#00B2FF") +
+  labs(x = "Distance (cm)", y = "Density") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0.001)) +
+  theme_classic()
+
+
+## Illustration of distribution of thresholded distances ----
+#--------------------------------------------------------------------------#
+# Apply threshold
+plank_dist <- plank_dist %>% filter(dist < 11)
+rand_dist <- rand_dist %>% filter(dist < 11 )
+
+# Get quantiles
+plank_dist_qt <- quantile(plank_dist$dist, probs = probs, names = FALSE)
+rand_dist_qt <- quantile(rand_dist$dist, probs = probs, names = FALSE)
+
+ggplot() +
+  geom_density(aes(x = plank_dist_qt), colour = "#00B2FF") +
+  labs(x = "Distance (cm)", y = "Density") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0.001)) +
+  theme_classic()
+
+bind_rows(
+  tibble(dist = plank_dist_qt, type = "Plankton"),
+  tibble(dist = rand_dist_qt, type = "Null")
+) %>% 
+  ggplot() +
+  geom_density(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#00B2FF", "grey"), labels = c("Plankton", "Null")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0.001)) +
+  theme_classic()
 
 
 ## Illustration of distribution of distances ----
