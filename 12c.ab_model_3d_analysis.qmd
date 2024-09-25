@@ -309,7 +309,7 @@ It seems that model parameters do cover the observations Kuiper statistic. Let�
 sim_sel <- sim_res_ks %>% 
   mutate(
     obs_kuiper_stat = obs_ks$kuiper_stat,
-    diff_kuiper_stat = kuiper_stat - obs_kuiper_stat
+    diff_kuiper_stat = abs(kuiper_stat - obs_kuiper_stat)
     ) %>% 
   filter(diff_kuiper_stat == min(diff_kuiper_stat))
 
@@ -356,3 +356,64 @@ Selected parameters are:
 -   density bandwidth: `r sim_sel$h`
 
 Ideally, continuous and dotted lines should be identical.
+
+### Compare with observations: second method
+
+Here, we compute Kuiper statistic between modeled distances after and observations.
+
+```{r mod_vs_obs_ks}
+#| fig-column: body-outset
+#| out-width: 100%
+# Get observations quantiles
+plank_dist_sub_qt <- quantile(plank_dist_sub$dist, probs = probs, names = FALSE)
+
+# Loop over sets of parameters
+sim_vs_obs_ks <- lapply(sim_res_gr, function(el) {
+  # Exract distances
+  dist_mod <- el %>% filter(when == "after") %>% pull(dist)
+  n_dist_mod <- length(dist_mod)
+  
+  # Extract quantiles 
+  dist_mod_qt <- quantile(dist_mod, probs = probs, names = FALSE)
+
+  # Compute Kuiper stat
+  kt <- kuiper_stat(dist_mod_qt, plank_dist_sub_qt)
+  
+  # Format results
+  res <- tibble(
+    d_length = el$d_length[1], # displacement length
+    prop_mv = el$prop_mv[1], # proportion of motile organisms
+    h = el$h[1], # density sensitivity
+    n_dist_mod = n_dist_mod, # Number of modelled distances
+    n_dist_obs = nrow(plank_dist_sub), # Number of observed distances
+    n_dist = (n_dist_mod + n_dist_obs) / 2, # Averaged number of distances
+    kuiper_stat = kt, # Kuiper statistic
+    dist_mod_qt = list(dist_mod_qt), # quantiles for modelled distances
+    dist_obs_qt = list(plank_dist_sub_qt) # quantiles for observed distances
+  )
+  return(res)
+}) %>% 
+  bind_rows() %>% 
+  arrange(kuiper_stat) # so that rows are ordered by kuiper stat values
+
+
+sim_vs_obs_ks %>% 
+  mutate(set = paste0("d_length: ", d_length, "; h: ", h) %>% fct_inorder()) %>% # generate label for set, ordered by Kuiper stat values 
+  select(set, kuiper_stat, dist_mod_qt, dist_obs_qt) %>% 
+  unnest(c(dist_mod_qt, dist_obs_qt)) %>% 
+  pivot_longer(dist_mod_qt:dist_obs_qt) %>% 
+  mutate(name = ifelse(str_detect(name, "mod"), "model", "obs.")) %>% 
+  ggplot() +
+  geom_density(aes(x = value, linetype = name, colour = kuiper_stat)) +
+  scale_colour_viridis_c() +
+  labs(x = "Distance (cm)", y = "Density", colour = "Kuiper stat", linetype = "What") +
+  theme_classic() +
+  facet_wrap(~set)
+
+```
+
+With this second method, chosen parameters are:
+
+-   displacement length:  `r sim_vs_obs_ks %>% slice(1) %>% pull(d_length)` px
+
+-   density bandwidth:  `r sim_vs_obs_ks %>% slice(1) %>% pull(h)`

@@ -426,7 +426,7 @@ arrows <- crossing(
     dist_px = sqrt((x_end - x)^2 + (y_end - y)^2),
     dist_cm = dist_px * 51 / 10000
   ) %>% 
-  filter(dist_cm < 10)
+  filter(dist_cm < dist_thr)
 
 
 ggplot(df) +
@@ -442,8 +442,9 @@ ggplot(df) +
 
 ## Density
 # Compute density
-h <- 400000
+h <- 200000
 dens_3d <- calculate_density_3d(df, h = h, vol = vol)
+
 
 # Extract results
 dens_to_plot <- dens_3d$eval.points %>% 
@@ -472,7 +473,7 @@ grad <- calculate_density_gradient_3d(dens_3d)
 grad_points <- extract_gradient(df, gradient = grad, kde = dens_3d)
 grad_points
 
-d_length <- 300
+d_length <- 100
 grad_points <- tibble(
   dx = grad_points$dx,
   dy = grad_points$dy,
@@ -528,7 +529,7 @@ arrows_after <- crossing(
     dist_px = sqrt((x_end - x)^2 + (y_end - y)^2),
     dist_cm = dist_px * 51 / 10000
   ) %>% 
-  filter(dist_cm < 10)
+  filter(dist_cm < dist_thr)
 
 ggplot(df) +
   geom_point(aes(x + dx_norm, y + dy_norm), colour = "#00B2FF") +
@@ -537,6 +538,94 @@ ggplot(df) +
   scale_y_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$y), expand = c(0, 0), breaks = NULL, name = NULL) +
   theme_classic() +
   coord_fixed()
+
+
+## Test density bandwidth ----
+#--------------------------------------------------------------------------#
+# Sample
+n <- 5
+set.seed(123456)
+#samp_t <- rt(n, df = 2)
+df$y
+
+# Comparison: same output and same parametrization for bandwidth
+bw <- 100
+kde_test <- ks::kde(x = df$y, h = bw)
+ggplot() +
+  geom_density(aes(x = df$y)) +
+  geom_path(aes(x = kde_test$eval.points, y = kde_test$estimate), colour = "red") +
+  theme_classic()
+
+
+# 1D: bandwidth ~ 1/5 of max value for x
+# 1D: bandwidth ~ 1/15 of max value for y
+
+
+
+  
+# Generate 1 image with 1 central point
+df <- tibble(x = vol$x / 2, y = vol$y / 2, z = vol$z / 2)
+# Plot image
+ggplot(df) +
+  geom_point(aes(x, y), show.legend = F) +
+  #scale_colour_gradient(high = "grey90", low = "black") +
+  scale_x_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$x), expand = c(0, 0), breaks = NULL, name = NULL) +
+  scale_y_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$y), expand = c(0, 0), breaks = NULL, name = NULL) +
+  theme_classic() +
+  coord_fixed()
+
+# Compute density
+h <- 200000
+
+h_try <- c(100000, 200000, 300000, 400000)
+dens_tries <- lapply(h_try, function(h) {
+  # Compute density
+  dens_3d <- calculate_density_3d(df, h = h, vol = vol)
+  
+  # Extract results
+  dens_to_plot <- dens_3d$eval.points %>% 
+    as_tibble() %>% 
+    mutate(dens = dens_3d$estimate) %>% 
+    group_by(x, y) %>% 
+    summarise(dens = mean(dens), .groups = "drop") %>% 
+    mutate(h = h)
+  
+  return(dens_to_plot)
+}) %>% 
+  bind_rows()
+
+## Plot density for one case
+#ggplot(dens_to_plot) +
+#  geom_raster(aes(x, y, fill = dens), show.legend = F) +
+#  geom_point(data = df, aes(x, y)) +
+#  #scale_fill_distiller(palette = "Oranges", direction = 1) +
+#  scale_fill_gradient(low = "#ffffff", high = "#FFEF68") +
+#  scale_x_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$x), expand = c(0, 0), breaks = NULL, name = NULL) +
+#  scale_y_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$y), expand = c(0, 0), breaks = NULL, name = NULL) +
+#  theme_classic() +
+#  coord_fixed()
+
+dens_1d <- dens_tries %>% 
+  group_by(h, x) %>% 
+  summarise(dens = mean(dens)) %>% 
+  ungroup()
+
+ggplot(dens_1d) + 
+  geom_path(aes(x = x, y = dens, colour = h, group = h)) +
+  scale_colour_viridis_c()
+
+dens_dist <- dens_1d %>% 
+  mutate(x_pt = df$x) %>% # add reference point 
+  filter(x <= x_pt) %>% # keep only densities left of this point
+  mutate(
+    dist = x_pt - x, # compute distance between point and location of density estimate
+    dist = dist * 51 / 10000 # convert from px to cm
+    ) %>% 
+  select(h, dist, dens)
+
+ggplot(dens_dist) + 
+  geom_path(aes(x = dist, y = dens, colour = h, group = h)) +
+  scale_colour_viridis_c()
 
 
 ## Model VS observations ----
