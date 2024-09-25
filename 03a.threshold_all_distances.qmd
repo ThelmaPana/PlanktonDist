@@ -23,8 +23,8 @@ source("utils.R")
 
 ```{r read}
 #| cache.lazy: false
-plank_dist <- read_parquet("data/distances/03.plankton_dist.parquet")
-rand_dist <- read_parquet("data/distances/03.random_dist.parquet")
+plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+rand_dist <- read_parquet("data/distances/02a.all_distances_random.parquet")
 ```
 
 ## Coarse thresholding
