@@ -56,6 +56,8 @@ ggplot(df) +
 
 ### Density bandwidth
 
+#### Examples
+
 Let’s compute density with various bandwidth values and plot results.
 
 ```{r dens_bandwidth}
@@ -96,6 +98,127 @@ lapply(1:length(h_values), function(i){
 ```
 
 Sane values are between `100000` and `400000`.
+
+#### Sensory radius in cm
+
+Try to find the equivalent sensory radius in cm.
+
+For this we generate an image with only 1 point at the center. We compute density using various bandwidth values and assess the decrease in density when going away from the point.
+
+```{r comp_bandwidth}
+#| fig-column: body-outset
+#| out-width: 100%
+#| fig.height: 3
+
+# Generate 1 image with 1 central point
+df_one <- tibble(x = vol$x / 2, y = vol$y / 2, z = vol$z / 2)
+# Plot image
+ggplot(df_one) +
+  geom_point(aes(x, y), show.legend = F) +
+  #scale_colour_gradient(high = "grey90", low = "black") +
+  scale_x_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$x), expand = c(0, 0), breaks = NULL, name = NULL) +
+  scale_y_continuous(sec.axis = dup_axis(breaks = NULL, name = NULL), limits = c(0, vol$y), expand = c(0, 0), breaks = NULL, name = NULL) +
+  theme_classic() +
+  coord_fixed()
+
+# Compute density for various bandwidth values
+h_try <- c(100000, 200000, 300000, 400000)
+dens_tries <- lapply(h_try, function(h) {
+  # Compute density
+  dens_3d <- calculate_density_3d(df_one, h = h, vol = vol)
+  
+  # Extract results
+  dens_to_plot <- dens_3d$eval.points %>% 
+    as_tibble() %>% 
+    mutate(dens = dens_3d$estimate) %>% 
+    group_by(x, y) %>% 
+    summarise(dens = mean(dens), .groups = "drop") %>% 
+    mutate(h = h)
+  
+  return(dens_to_plot)
+}) %>% 
+  bind_rows()
+
+# Compute average density on x axis
+dens_1d <- dens_tries %>% 
+  group_by(h, x) %>% 
+  summarise(dens = mean(dens)) %>% 
+  ungroup()
+
+ggplot(dens_1d) + 
+  geom_path(aes(x = x, y = dens, colour = h, group = h)) +
+  labs(y = "Density") +
+  scale_colour_viridis_c()
+
+# Now let’s plot using the point as a reference
+dens_dist <- dens_1d %>% 
+  mutate(x_pt = df_one$x) %>% # add reference point 
+  filter(x <= x_pt) %>% # keep only densities left of this point
+  mutate(
+    dist = x_pt - x, # compute distance between point and location of density estimate
+    dist = dist * 51 / 10000 # convert from px to cm
+    ) %>% 
+  select(h, dist, dens) %>% 
+  mutate(h = as.factor(h))
+
+ggplot(dens_dist) + 
+  geom_path(aes(x = dist, y = dens, colour = h, group = h)) +
+  labs(x = "Distance (cm)", y = "Density") +
+  scale_colour_viridis_d()
+```
+
+Let’s now find the distance after which density is \~null, i.e. the x value for which the AUC is 99% of the total AUC.
+
+```{r auc_dist}
+#| fig-column: body-outset
+#| out-width: 100%
+
+library(bayestestR)
+# Distances values  
+unique_dist <- dens_dist %>% select(dist) %>% unique()
+  
+# Compute AUC for each distance value
+dist_auc <- lapply(1:nrow(unique_dist), function(i) {
+  
+  # Get reference distance
+  dist_val <- unique_dist %>% slice(i) %>% pull(dist)
+  
+  # Compute AUC
+  res <- dens_dist %>% 
+    filter(dist < dist_val) %>% # keep only distances below threshold
+    #rename(x = dist, y = dens) %>% 
+    group_by(h) %>% # group by density bandwidth
+    summarise(auc = bayestestR::auc(x = dist, y = dens)) %>% 
+    mutate(dist = dist_val) # store distance
+  
+  return(res)
+}) %>% 
+  bind_rows()
+
+# For each case, compute proportion of AUC compared to total AUC for given bandwidth
+dist_auc <- dist_auc %>% 
+  group_by(h) %>% 
+  mutate(auc_prop = auc / max(auc)) %>% 
+  ungroup() %>% 
+  mutate(h = as.factor(h))
+
+thres <- 0.99 # threshold, i.e. we want the distance for which AUC is 99% of total AUC
+ggplot(dist_auc) +
+  geom_hline(yintercept = thres, colour = "grey") +
+  geom_path(aes(x = dist, y = auc_prop, colour = h, group = h)) +
+  scale_colour_viridis_d() +
+  labs(x = "Distance (cm)", y = "AUC proportion") +
+  theme_classic()
+
+# Extract the corresponding distance
+# This represents the sensory radius
+dist_auc %>% 
+  filter(auc_prop > thres) %>% 
+  group_by(h) %>% 
+  filter(dist == min(dist)) %>% 
+  ungroup() %>% 
+  select(h, dist)
+```
 
 ### Displacement length
 
