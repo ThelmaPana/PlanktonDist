@@ -1,0 +1,178 @@
+---
+title: "Results of the selected agent based model simulating plankton displacement"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: false
+  freeze: false
+---
+
+```{r set_up}
+#| echo: false
+#| cache: false
+source("utils.R")
+source("utils_ab_model.R")
+```
+
+Chosen parameters are:
+
+-   density bandwidth: 300000
+
+-   displacement length: 50 px
+
+## Load data
+
+```{r load}
+# Simulation results
+sim_res <- read_parquet("data/12b.fine_simulation_results.parquet")
+
+# Plankton distances
+plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
+
+# Kuiper stat for null dataset
+load("data/04b.null_ks.Rdata")
+```
+
+## Model results
+
+### Compare with all observations
+
+For both model and observations, apply distance threshold, extract 10000 quantiles and compute Kuiper stat.
+
+```{r process_full}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Keep only distances below threshold
+sim_res <- sim_res %>% filter(dist < dist_thr)
+plank_dist <- plank_dist %>% filter(dist < dist_thr)
+
+# Generate 10000 quantiles
+mod_qt <- quantile(sim_res %>% filter(when == "after") %>% pull(dist), probs = probs, names = FALSE)
+obs_qt <- quantile(plank_dist$dist, probs = probs, names = FALSE)
+null_qt <- quantile(sim_res %>% filter(when == "before") %>% pull(dist), probs = probs, names = FALSE)
+
+# Compute Kuiper statistic
+ks <- kuiper_stat(mod_qt, obs_qt)
+ks
+
+ks_obs_mod <- tibble(
+  n_dist_mod = nrow(sim_res %>% filter(when == "after")),
+  n_dist_obs = nrow(plank_dist),
+  n_dist = (n_dist_mod + n_dist_obs) / 2,
+  kuiper_stat = ks,
+  mod_qt = list(mod_qt),
+  obs_qt = list(obs_qt),
+  null_qt = list(null_qt)
+) %>% 
+  mutate(
+    log_kuiper_stat = log10(kuiper_stat),
+    log_n_dist_obs = log10(n_dist_obs),
+    log_n_dist_mod = log10(n_dist_mod),
+    log_n_dist = log10(n_dist)
+  )
+
+
+ks_obs_mod_dist <- ks_obs_mod %>% 
+  pivot_longer(log_n_dist_obs:log_n_dist, values_to = "log_n_dist") %>% 
+  mutate(name = str_remove(name, "log_"))
+
+# Plot with null to null KS
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = ks_obs_mod_dist, aes(x = log_n_dist, y = log_kuiper_stat, colour = name)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Number of\ndistances") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+Let’s also plot distributions.
+
+```{r plot_dist_full}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot distributions
+ks_obs_mod %>% 
+  select(mod_qt, obs_qt, null_qt) %>% 
+  unnest(c(mod_qt, obs_qt, null_qt)) %>% 
+  pivot_longer(mod_qt:null_qt, names_to = "type", values_to = "dist") %>% 
+  mutate(type = str_remove(type, "_qt")) %>% 
+  ggplot() +
+  geom_density(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#fd8d3c", "grey", "#00B2FF")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  theme_classic()
+# NB: here the null is from the model
+```
+
+### Compare with subsample of observations
+
+Let’s redo the same analysis but this time we subsample observations to match the number of modeled distances.
+
+```{r process_sub}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Subsample plankton distances
+plank_dist_sub <- plank_dist %>% slice_sample(n = nrow(sim_res %>% filter(when == "after")))
+
+# Generate 10000 quantiles
+obs_sub_qt <- quantile(plank_dist_sub$dist, probs = probs, names = FALSE)
+
+# Compute Kuiper statistic
+ks_sub <- kuiper_stat(mod_qt, obs_sub_qt)
+ks
+
+ks_obs_mod_sub <- tibble(
+  n_dist_mod = nrow(sim_res %>% filter(when == "after")),
+  n_dist_obs = nrow(plank_dist_sub),
+  n_dist = (n_dist_mod + n_dist_obs) / 2,
+  kuiper_stat = ks,
+  mod_qt = list(mod_qt),
+  obs_qt = list(obs_qt),
+  null_qt = list(null_qt)
+) %>% 
+  mutate(
+    log_kuiper_stat = log10(kuiper_stat),
+    log_n_dist = log10(n_dist)
+  )
+
+# Plot with null to null KS
+ggplot() +
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = ks_obs_mod_sub, aes(x = log_n_dist, y = log_kuiper_stat)) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Number of\ndistances") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```
+
+Let’s plot distributions.
+
+```{r plot_dist_sub}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Plot distributions
+ks_obs_mod %>% 
+  select(mod_qt, obs_qt, null_qt) %>% 
+  unnest(c(mod_qt, obs_qt, null_qt)) %>% 
+  pivot_longer(mod_qt:null_qt, names_to = "type", values_to = "dist") %>% 
+  mutate(type = str_remove(type, "_qt")) %>% 
+  ggplot() +
+  geom_density(aes(x = dist, colour = type)) +
+  scale_colour_manual(values = c("#fd8d3c", "grey", "#00B2FF")) +
+  labs(x = "Distance (cm)", y = "Density", colour = "Type") +
+  theme_classic()
+# NB: here the null is from the model
+```

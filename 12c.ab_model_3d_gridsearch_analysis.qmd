@@ -1,5 +1,5 @@
 ---
-title: "Results of the agent based model simulating plankton displacement"
+title: "Results of the gridsearch for the agent based model simulating plankton displacement"
 author: "Thelma Panaïotis"
 format: 
   html:
@@ -24,7 +24,7 @@ source("utils_ab_model.R")
 
 ```{r load}
 # Simulation results
-sim_res <- read_parquet("data/12b.simulation_results.parquet")
+sim_res <- read_parquet("data/12b.fine_simulation_results_gridsearch.parquet")
 
 # Kuiper stat for null dataset
 load("data/04b.null_ks.Rdata")
@@ -353,7 +353,7 @@ Selected parameters are:
 
 -   displacement length: `r sim_sel$d_length`
 
--   density bandwidth: `r sim_sel$h`
+-   density bandwidth: `r format(sim_sel$h, scientific = FALSE)`
 
 Ideally, continuous and dotted lines should be identical.
 
@@ -416,4 +416,4 @@ With this second method, chosen parameters are:
 
 -   displacement length:  `r sim_vs_obs_ks %>% slice(1) %>% pull(d_length)` px
 
--   density bandwidth:  `r sim_vs_obs_ks %>% slice(1) %>% pull(h)`
+-   density bandwidth:  `r sim_vs_obs_ks %>% slice(1) %>% pull(h) %>% format(scientific = FALSE)`

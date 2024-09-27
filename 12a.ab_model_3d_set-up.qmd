@@ -137,7 +137,8 @@ dens_tries <- lapply(h_try, function(h) {
   
   return(dens_to_plot)
 }) %>% 
-  bind_rows()
+  bind_rows() %>% 
+  mutate(h = as.factor(h))
 
 # Compute average density on x axis
 dens_1d <- dens_tries %>% 
@@ -148,7 +149,7 @@ dens_1d <- dens_tries %>%
 ggplot(dens_1d) + 
   geom_path(aes(x = x, y = dens, colour = h, group = h)) +
   labs(y = "Density") +
-  scale_colour_viridis_c()
+  scale_colour_viridis_d()
 
 # Now let’s plot using the point as a reference
 dens_dist <- dens_1d %>% 
@@ -158,8 +159,7 @@ dens_dist <- dens_1d %>%
     dist = x_pt - x, # compute distance between point and location of density estimate
     dist = dist * 51 / 10000 # convert from px to cm
     ) %>% 
-  select(h, dist, dens) %>% 
-  mutate(h = as.factor(h))
+  select(h, dist, dens) 
 
 ggplot(dens_dist) + 
   geom_path(aes(x = dist, y = dens, colour = h, group = h)) +
