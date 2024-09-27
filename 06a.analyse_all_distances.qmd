@@ -102,3 +102,34 @@ To automatically detect the sense of variation, we can compute the difference be
 
 **Distances between planktonic organisms differ from the distances that could be expected if plankton was randomly distributed: planktonic organisms are closer.**
 :::
+
+Median distance for null and plankton, on 10000 quantiles.
+
+::: callout-note
+For this, we need to generate an x axis right?
+:::
+
+```{r check_diff}
+#| fig-column: body-outset
+#| out-width: 100%
+
+df_all_dist %>% split(.$type) %>% map(summary)
+# Difference in median of 1.4 mm
+
+# Plot differences in quantiles
+df_all_dist %>% 
+  mutate(type = str_to_lower(type)) %>% 
+  group_by(type) %>% # separately for plankton and null
+  reframe(dist = quantile(dist, probs = seq(0, 1, by = 0.01))) %>% # compute percentiles
+  pivot_wider(names_from = type, values_from = dist, values_fn = list) %>% # plankton and null quantiles in two columns
+  unnest(c(plankton, null)) %>% 
+  mutate(
+    diff = null - plankton, # compute difference between null and plankton quantiles
+    x_axis = seq(0, 1, by = 0.01) * dist_thr # add X axis sequence, i.e. percentiles times the max distance
+    ) %>% 
+  ggplot() +
+  geom_path(aes(x = x_axis, y = diff)) +
+  labs(x = "Distance (cm)", y = "Null quantiles - plankton quantiles (cm)") +
+  theme_classic()
+  
+```
