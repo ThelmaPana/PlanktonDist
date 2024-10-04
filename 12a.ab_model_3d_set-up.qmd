@@ -99,7 +99,9 @@ lapply(1:length(h_values), function(i){
 
 Sane values are between `100000` and `400000`.
 
-#### Sensory radius in cm
+#### Convert to sensory radius in cm
+
+Let’s translate these `r h` values into meaningful sensory radius in centimetres.
 
 Try to find the equivalent sensory radius in cm.
 
@@ -122,7 +124,7 @@ ggplot(df_one) +
   coord_fixed()
 
 # Compute density for various bandwidth values
-h_try <- c(100000, 200000, 300000, 400000)
+h_try <- c(50000, 100000, 200000, 400000, 800000, 1600000)
 dens_tries <- lapply(h_try, function(h) {
   # Compute density
   dens_3d <- calculate_density_3d(df_one, h = h, vol = vol)
@@ -220,6 +222,32 @@ dist_auc %>%
   select(h, dist)
 ```
 
+#### Sensory radius in cm to h values
+
+For our model, we’ll use sensory radius values in cm. Let’s find the relationship between sensory radius in cm and h values.
+
+```{r sens_r}
+dist_sens <- dist_auc %>% 
+  filter(auc_prop > thres) %>% 
+  group_by(h) %>% 
+  filter(dist == min(dist)) %>% 
+  ungroup() %>% 
+  mutate(h = as.numeric(levels(h))[h])
+
+ggplot(dist_sens, aes(x = dist, y = h)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3, raw = TRUE))
+# Looks like an x³ relationship, let’s fit it
+
+# Fit a degree 3 polynom
+mod_sr <- lm(h ~ poly(dist, 3, raw = TRUE), toto)
+summary(mod_sr)
+# Very good fit indeed
+tidy(mod_sr)
+```
+
+We will use model coefficients later for the conversion.
+
 ### Displacement length
 
 ```{r d_length}
@@ -280,3 +308,35 @@ motility_counts %>%
 ```
 
 Overall, 96% of organisms in the dataset are motile. The proportion with buoyancy control only is negligible.
+
+## Parameter grid
+
+Let’s generate our parameter grid:
+
+-   sensory radius: `5`, `10` and `20` cm
+
+-   displacement: `1`, `2`, `4` and `8` mm
+
+-   motility rate: `96%`
+
+```{r grid_def}
+# Initiate our parameter grid with targeted values
+param_grid <- crossing(
+  sr = c(5, 10, 20),                   # sensory radius (cm)
+  d_length_cm = c(0.1, 0.2, 0.4, 0.8), # displacement length (cm)
+  prop_mv = 0.96                       # motility rate
+)
+
+# Compute density bandwidth (h) to match sensory radius values
+param_grid <- augment(mod_sr, newdata = param_grid %>% rename(dist = sr)) %>% 
+  # use fitted model to compute h from sensory radius
+  select(sr = dist, h = .fitted, d_length_cm, prop_mv) %>% 
+  mutate(h = round(h)) # round value of h
+
+# Convert displacement length from cm to px and round it
+param_grid <- param_grid %>% 
+  mutate(d_length_px = round((d_length_cm * 10000) / 51), .after = d_length_cm)
+
+# Save grid
+save(param_grid, file = "data/12a.parameters_grid.Rdata")
+```
