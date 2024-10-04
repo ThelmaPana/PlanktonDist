@@ -1,0 +1,468 @@
+---
+title: "Compute co-occurrences between taxonomic groups."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+source("utils.R")
+```
+
+## Read data
+
+```{r read}
+#| cache: false
+# Read plankton and images
+plankton <- read_parquet("data/00.plankton_clean.parquet") # no need to use the X correction here
+images <- read_parquet("data/00.images_clean.parquet")
+
+# List taxonomic groups
+taxa <- plankton %>% select(taxon) %>% distinct() %>% pull(taxon) %>% sort()
+# Drop unwanted groups
+taxa <- setdiff(taxa, c("Collodaria_colonial", "Rhizaria"))
+plankton <- plankton %>% filter(taxon %in% taxa)
+```
+
+Let’s plot the distribution of abundances.
+
+```{r plot_abund}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Counts objects per image and per taxonomic group
+plankton_counts <- plankton %>% 
+  count(img_name, taxon)
+
+ggplot(plankton_counts) +
+  geom_histogram(aes(x = n)) +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "N organsims", y = "Count") +
+  theme_classic()
+```
+
+::: callout-note
+Distribution of abundances is somehow log-normal.
+:::
+
+First, we need to generate an abundance matrix, i.e. combination of all images by taxonomic groups.
+
+## Explore co-occurrences
+
+### First example with 100 images
+
+```{r example_100}
+#| fig-column: body-outset
+#| out-width: 100%
+
+set.seed(12)
+n_sub <- 100 # number of images to select
+
+# Subsample images
+images_ssub_1 <- images %>% 
+  slice_sample(n = n_sub) %>% 
+  # Create readable label for images
+  mutate(img = paste0("img_", str_pad(row_number(), width = nchar(n_sub), pad = "0")))
+
+# Get plankton in selected images
+plankton_ssub_1 <- plankton %>% 
+  filter(img_name %in% images_ssub_1$img_name) %>% 
+  # add new image names
+  left_join(images_ssub_1 %>% select(img_name, img), by = join_by(img_name))
+
+## Abundance matrix
+# Create all combination of imgs by taxon
+mat_1 <- crossing(taxon = taxa, img = images_ssub_1$img) %>% 
+  left_join(count(plankton_ssub_1, img, taxon), by = join_by(taxon, img)) %>% 
+  replace_na(list(n = 0)) %>% 
+  pivot_wider(names_from = img, values_from = n, values_fill = 0) %>% 
+  arrange(taxon) %>% 
+  select(-taxon) %>% 
+  as.matrix() ## Convert abundance data to matrix form for faster access
+
+# Prepare storage for correlations using only taxa that are present
+df_corr_1 <- crossing(t1 = taxa, t2 = taxa) %>% 
+  filter(t1 <= t2) 
+
+# Create a named vector for taxa to index the abundance matrix
+taxa_indices <- setNames(1:nrow(mat_1), taxa)
+
+# Compute correlations
+df_corr_1 <- df_corr_1 %>%
+  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_1, taxa_indices, method = "pearson", log_transform = FALSE)))
+
+# Plot matrix of correlations
+ggplot(df_corr_1) +
+  geom_tile(aes(x = t1, y = t2, fill = corr)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Corr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+This seems to work. Let’s do another example to check variability.
+
+### Second example with 100 images
+
+```{r example_100_bis}
+#| fig-column: body-outset
+#| out-width: 100%
+
+set.seed(13)
+n_sub <- 100 # number of images to select
+
+# Subsample images
+images_ssub_2 <- images %>% 
+  slice_sample(n = n_sub) %>% 
+  # Create readable label for images
+  mutate(img = paste0("img_", str_pad(row_number(), width = nchar(n_sub), pad = "0")))
+
+# Get plankton in selected images
+plankton_ssub_2 <- plankton %>% 
+  filter(img_name %in% images_ssub_2$img_name) %>% 
+  # add new image names
+  left_join(images_ssub_2 %>% select(img_name, img), by = join_by(img_name))
+
+## Abundance matrix
+# Create all combination of imgs by taxon
+mat_2 <- crossing(taxon = taxa, img = images_ssub_2$img) %>% 
+  left_join(count(plankton_ssub_2, img, taxon), by = join_by(taxon, img)) %>% 
+  replace_na(list(n = 0)) %>% 
+  pivot_wider(names_from = img, values_from = n, values_fill = 0) %>% 
+  arrange(taxon) %>% 
+  select(-taxon) %>% 
+  as.matrix() ## Convert abundance data to matrix form for faster access
+
+# Prepare storage for correlations using only taxa that are present
+df_corr_2 <- crossing(t1 = taxa, t2 = taxa) %>% 
+  filter(t1 <= t2) 
+
+# Create a named vector for taxa to index the abundance matrix
+taxa_indices <- setNames(1:nrow(mat_2), taxa)
+
+# Compute correlations
+df_corr_2 <- df_corr_2 %>%
+  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_2, taxa_indices, method = "pearson", log_transform = FALSE)))
+
+# Plot matrix of correlations
+ggplot(df_corr_2) +
+  geom_tile(aes(x = t1, y = t2, fill = corr)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Corr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+::: callout-note
+We see that there is variability between examples. Let’s try to find an appropriate sample size.
+:::
+
+## Investigate sample size
+
+We are going to perform 2 blocks of 100 repetitions of 10,000 images each, then assess whether there is variability between blocks. (In total, we have \~620,000 images available.)
+
+### Run computations
+
+::: callout-important
+The 10000 images can be shared among repetitions / blocks. Is this something we want to specifically avoid? Overall this is a matter of resampling with or without repetition.
+:::
+
+```{r run_blocks}
+#| fig-column: body-outset
+#| out-width: 100%
+
+n_blocks <- 2 # number of blocks
+n_rep <- 100 # number of repetitions within each block
+
+df_corr <- mclapply(1:(n_blocks*n_rep), function(i) {
+  
+  # Number of images to select
+  n_sub <- 10000
+  
+  # Select images
+  images_ssub <- images %>% 
+    slice_sample(n = n_sub) %>% 
+    mutate(img = paste0("img_", str_pad(row_number(), width = nchar(n_sub), pad = "0")))
+  
+  # Get plankton in selected images
+  plankton_ssub <- plankton %>% 
+    filter(img_name %in% images_ssub$img_name) %>% 
+    left_join(images_ssub %>% select(img_name, img), by = join_by(img_name))
+  
+  ## Abundance matrix
+  # Create all combination of imgs by taxon
+  mat <- crossing(taxon = taxa, img = images_ssub$img) %>% 
+    left_join(count(plankton_ssub, img, taxon), by = join_by(taxon, img)) %>% 
+    replace_na(list(n = 0)) %>% 
+    pivot_wider(names_from = img, values_from = n, values_fill = 0) %>% 
+    arrange(taxon) %>% 
+    select(-taxon) %>% 
+    as.matrix() ## Convert abundance data to matrix form for faster access
+  
+  
+  # Prepare storage for correlations using only taxa that are present
+  df_corr <- crossing(t1 = taxa, t2 = taxa) %>% 
+    filter(t1 <= t2) 
+  
+  # Create a named vector for taxa to index the abundance matrix
+  taxa_indices <- setNames(1:nrow(mat), taxa)
+  
+  # Compute correlations
+  df_corr <- df_corr %>%
+    mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "pearson", log_transform = FALSE))) %>% 
+    mutate(idx = i) # index label, will be used to recover block / repetition
+  
+  return(df_corr)
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+
+# Let’s retrieve blocks and repetitions from index
+df_corr <- df_corr %>% 
+  mutate(
+    block = ifelse(idx <= n_rep, 1, 2), # blocks from number of repetitions
+    rep = idx - (as.numeric(block) - 1) * 100 # repetition from block
+  ) %>% 
+  select(-idx) %>% 
+  # repetition and block as factor
+  mutate(block = as.factor(block), rep = as.factor(rep))
+```
+
+### Summarise results
+
+Now, let’s compute average and standard deviation across repetitions, within each block.
+
+```{r summary_corr}
+# Compute mean and sd of correlation within each block
+df_summ <- df_corr %>% 
+  group_by(block, t1, t2) %>% 
+  summarise(
+    mean_corr = mean(corr, na.rm = TRUE),
+    sd_corr = sd(corr, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+### Plot results
+
+Let’s start with mean correlation across repetitions but within blocks.
+
+```{r plot_mean_blocks}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_summ) +
+  geom_tile(aes(x = t1, y = t2, fill = mean_corr)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Mean\ncorr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~block, labeller = "label_both")
+```
+
+Let’s now plot standard deviation.
+
+```{r plot_sd_blocks}
+#| fig-column: screen-inset
+#| out-width: 100%
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_summ) +
+  geom_tile(aes(x = t1, y = t2, fill = sd_corr)) +
+  scale_fill_viridis_c(na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Sd\ncorr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~block, labeller = "label_both")
+```
+
+Quite similar as well. Seems like with this sample size we get rid of variability. Let’s now compute the mean and sd for all our repetitions, regardless of blocks, and use this as final results.
+
+## Investigate correlation type
+
+Let’s try different correlations:
+
+-   `pea`: pearson on raw concentrations (as before)
+
+-   `pea_log`: pearson on log-transformed concentrations
+
+-   `spe`: spearman on raw concentrations
+
+For this, let’s just do 100 repetitions of 10,000 images
+
+```{r corr_methods}
+#| fig-column: body-outset
+#| out-width: 100%
+
+df_corr_met <- mclapply(1:n_rep, function(i) {
+  
+  # Number of images to select
+  n_sub <- 10000
+  
+  # Select images
+  images_ssub <- images %>% 
+    slice_sample(n = n_sub) %>% 
+    mutate(img = paste0("img_", str_pad(row_number(), width = nchar(n_sub), pad = "0")))
+  
+  # Get plankton in selected images
+  plankton_ssub <- plankton %>% 
+    filter(img_name %in% images_ssub$img_name) %>% 
+    left_join(images_ssub %>% select(img_name, img), by = join_by(img_name))
+  
+  ## Abundance matrix
+  # Create all combination of imgs by taxon
+  mat <- crossing(taxon = taxa, img = images_ssub$img) %>% 
+    left_join(count(plankton_ssub, img, taxon), by = join_by(taxon, img)) %>% 
+    replace_na(list(n = 0)) %>% 
+    pivot_wider(names_from = img, values_from = n, values_fill = 0) %>% 
+    arrange(taxon) %>% 
+    select(-taxon) %>% 
+    as.matrix() ## Convert abundance data to matrix form for faster access
+  
+  
+  # Prepare storage for correlations using only taxa that are present
+  df_corr <- crossing(t1 = taxa, t2 = taxa) %>% 
+    filter(t1 <= t2) 
+  
+  # Create a named vector for taxa to index the abundance matrix
+  taxa_indices <- setNames(1:nrow(mat), taxa)
+  
+  # Compute correlations
+  df_corr <- df_corr %>%
+    mutate(
+      corr_pea = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "pearson", log_transform = FALSE)),
+      corr_pea_log = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "pearson", log_transform = TRUE)),
+      corr_spe = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "spearman", log_transform = FALSE))
+      ) %>% 
+    mutate(idx = i) # index label, will be used to recover block / repetition
+  
+  return(df_corr)
+}, mc.cores = n_cores) %>% 
+  bind_rows()
+
+
+# Let’s compute averages and sd across repetitions
+df_corr_met_avg <- df_corr_met %>% 
+  group_by(t1, t2) %>% 
+  summarise(across(corr_pea:corr_spe, list(mean = mean, sd = sd)), .groups = "drop")
+
+# Plots to compare correlations
+ggplot(df_corr_met_avg) +
+  geom_abline(slope = 1, intercept = 0, colour = "grey90") +
+  geom_point(aes(x = corr_pea_mean, y = corr_pea_log_mean, colour = corr_spe_mean)) +
+  scale_colour_gradient2(low = "#ef8a62", high = "#67a9cf", mid = "#ffffbf",  na.value = "grey90") +
+  labs(x = "Pearson raw", y = "Pearson log", colour = "Spearman") 
+
+
+df_corr_met_avg %>% 
+  mutate(pair = str_c(t1, t2, sep = " - ")) %>% 
+  select(pair, t1, t2, contains("mean")) %>% 
+  pivot_longer(contains("mean")) %>% 
+  mutate(name = str_remove(name, "corr_")) %>% 
+  ggplot(aes(x = name, y = value)) +
+  geom_point(size = 0.5) +
+  geom_line(aes(group = pair), alpha = 0.5, linewidth = 0.1, colour = "grey10") +
+  scale_x_discrete(labels = c("Pearson log", "Pearson raw", "Spearman")) +
+  labs(x = "Correlation type", y = "Correlation value")
+
+```
+
+::: callout-note
+It seems that the type of correlation does not affect much the results.
+:::
+
+## Final results
+
+Let’s use pearson correlation on log-transformed data.
+
+```{r summary_final}
+# Compute mean and sd of correlation within each block
+df_mat_cooc <- df_corr_met %>% 
+  group_by(t1, t2) %>% 
+  summarise(
+    mean_corr = mean(corr_pea_log, na.rm = TRUE),
+    sd_corr = sd(corr_pea_log, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Let’s plot mean and sd.
+
+```{r plot_mean}
+#| fig-column: body-outset
+#| out-width: 100%
+
+ggplot(df_mat_cooc) +
+  geom_tile(aes(x = t1, y = t2, fill = mean_corr)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Mean\ncorr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r plot_sd}
+#| fig-column: body-outset
+#| out-width: 100%
+
+ggplot(df_mat_cooc) +
+  geom_tile(aes(x = t1, y = t2, fill = sd_corr)) +
+  scale_fill_viridis_c(na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Sd\ncorr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Save
+
+Save the resulting co-occurrence matrix.
+
+```{r save}
+# Save results
+save(df_mat_cooc, file = "data/15.co_occurrence_matrix.Rdata")
+```
+
+## Interpretation
+
+Let’s look for high correlations.
+
+```{r high_corr}
+#| fig-column: body-outset
+#| out-width: 100%
+
+corr_thr <- 0.1 # correlation threshold to consider
+
+df_mat_cooc_thr <- df_mat_cooc %>% 
+  mutate(mean_corr = ifelse(abs(mean_corr) > corr_thr, mean_corr, NA))
+
+ggplot(df_mat_cooc_thr) +
+  geom_tile(aes(x = t1, y = t2, fill = mean_corr)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = NA) +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Mean\ncorr.") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Let’s list negative correlations.
+
+```{r list_neg}
+df_mat_cooc_thr %>% filter(mean_corr < 0) %>% arrange(desc(abs(mean_corr)))
+```
+
+And positive correlations.
+
+```{r list_pov}
+df_mat_cooc_thr %>% filter(mean_corr > 0) %>% arrange(desc(abs(mean_corr)))
+```

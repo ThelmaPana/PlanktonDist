@@ -228,3 +228,51 @@ compute_all_dist <- function(points, n_cores = 12, z_dim = FALSE) {
 }
 
 
+#' Get Correlation Between Two Taxa
+#'
+#' This function computes the correlation between the abundances of two taxa, with options to choose
+#' the correlation method (Pearson or Spearman) and log-transform the abundances.
+#'
+#' @param t1 A character string representing the first taxon.
+#' @param t2 A character string representing the second taxon.
+#' @param abundance_mat A matrix where rows represent different taxa and columns represent samples. The values in the matrix correspond to the abundances of each taxon in each sample.
+#' @param taxa_indices A named list where names correspond to taxon names and values are the row indices of those taxa in `abundance_mat`.
+#' @param method A character string specifying the correlation method to use. Options are `"pearson"` (default) or `"spearman"`.
+#' @param log_transform A logical value indicating whether to log-transform the abundances before calculating correlation. Default is `FALSE`. The log transformation applied is `log(abundance + 1)` to avoid issues with zeros.
+#'
+#' @return A numeric value representing the correlation between the two taxa, or `NA` if the taxa have zero variance or are identical.
+#'
+#' @details
+#' The function first extracts the abundances for the specified taxa (`t1` and `t2`) from `abundance_mat`. If `log_transform = TRUE`, the abundances are log-transformed using the natural logarithm (with a pseudocount of 1). The function then checks for zero variance in either taxon. If either taxon has zero variance, it returns `NA`. If the taxa are different, the function computes the correlation using the specified method (Pearson or Spearman). If `t1` and `t2` are the same taxon, the function returns `NA`.
+#'
+#' @examples
+#' # Example usage:
+#' abundance_matrix <- matrix(abs(rnorm(100)), nrow = 10)  # Example abundance matrix (10 taxa, 10 samples)
+#' taxa_idx <- list("taxon1" = 1, "taxon2" = 2)  # Example taxa indices
+#' get_corr("taxon1", "taxon2", abundance_matrix, taxa_idx, method = "pearson", log_transform = TRUE)
+#'
+get_corr <- function(t1, t2, abundance_mat, taxa_indices, method = "spearman", log_transform = FALSE) {
+  idx1 <- taxa_indices[[t1]]
+  idx2 <- taxa_indices[[t2]]
+  ab_t1 <- abundance_mat[idx1, ]
+  ab_t2 <- abundance_mat[idx2, ]
+  
+  # Log-transform the abundances if specified
+  if (log_transform) {
+    ab_t1 <- log1p(ab_t1)  # log1p to avoid log(0) issues
+    ab_t2 <- log1p(ab_t2)
+  }
+  
+  # Check for zero variance
+  if (sd(ab_t1) == 0 || sd(ab_t2) == 0) {
+    return(NA)  # Return NA if variance is zero
+  }
+  
+  # Compute correlation if taxa are different
+  if (t1 != t2) {
+    cor(ab_t1, ab_t2, method = method)
+  } else {
+    NA
+  }
+}
+
