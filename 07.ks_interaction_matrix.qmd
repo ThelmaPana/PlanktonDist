@@ -41,12 +41,12 @@ df_inter_mat <- df_inter_scores %>%
   select(pair, kuiper_stat, z_score, dir, sig) %>% 
   separate_wider_delim(pair, delim = "-", names = c("t1", "t2"))
 # and generate reverse of t1 / t2
-df_inter_mat_bis <- df_inter_mat %>% rename(t2 = t1, t1 = t2)
+#df_inter_mat_bis <- df_inter_mat %>% rename(t2 = t1, t1 = t2)
 
 # Store all together
 df_pairs <- df_intra_mat %>% 
-  bind_rows(df_inter_mat) %>% 
-  bind_rows(df_inter_mat_bis)
+  bind_rows(df_inter_mat)# %>% 
+  #bind_rows(df_inter_mat_bis)
 ```
 
 ## Build the matrix
@@ -57,13 +57,15 @@ df_pairs <- df_intra_mat %>%
 
 # Create all combination of taxa and join scores
 taxa <- sort(unique(df_pairs$t1))
-df_mat <- crossing(t1 = taxa, t2 = taxa) %>% 
+df_mat_ks <- crossing(t1 = taxa, t2 = taxa) %>% 
+  filter(t1 <= t2) %>% 
   left_join(df_pairs %>% filter(sig), by = join_by(t1, t2))
 
+
 # Plot Kuiper stat and Z-score
-ggplot(df_mat) +
+ggplot(df_mat_ks) +
   geom_raster(aes(x = t1, y = t2, fill = kuiper_stat, alpha = z_score)) +
-  geom_text(data = df_mat %>% filter(dir == "further"), aes(x = t1, y = t2), label = "×") +
+  geom_text(data = df_mat_ks %>% filter(dir == "further"), aes(x = t1, y = t2), label = "×") +
   scale_fill_viridis_c(na.value = NA) +
   labs(fill = "Kuiper\nstatistic", alpha = "Z-score") +
   theme_classic() +
@@ -76,6 +78,8 @@ ggplot(df_mat) +
   coord_fixed()
 ```
 
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAABH0lEQVR4XmNgGAVDCqxdvzVhzcbNm6mBK6uqVqObDwf///9nXLt+SzG6JlJxTW3tVpBZ6OajgP3797Os3bClFV0zsbiuoXEfyAx0c7GCRTt3cq9Zv7UX3RBCuL6x8TBIL7p5eMGqVbv512zYMgvdMFy4san1FEgPujlEgbVrd0gCg3EJuqHouLm59TxILbp+ksCqjdvV12zcshLdcBhuamm7BFKDro8ssGbjRr01G7aux7Ckte0qSA5dPUVg9frNDkDLNsGDq7X9GkgMXR1VwNoNm0MgPmm/DmKjy49wwLjIbzM1MLq5GIBxgc9mhm2eFGGwGYQA42wvDI2kYrAZhADjdEyNpGKwGYQA42Q3DI2kYrAZBEGfy2aq4FEw5AAASl8F3R9fQqAAAAAASUVORK5CYII= "Run All Chunks Above")
+
 This time let’s plot the matrix with the direction of the interaction.
 
 ```{r mat_dir}
@@ -83,7 +87,7 @@ This time let’s plot the matrix with the direction of the interaction.
 #| out-width: 100%
 
 # Plot direction and Z-score
-ggplot(df_mat) +
+ggplot(df_mat_ks) +
   geom_raster(aes(x = t1, y = t2, fill = dir, alpha = z_score)) +
   scale_fill_manual(values = c("#67a9cf", "#ef8a62"), na.value = NA) +
   labs(fill = "Direction", alpha = "Z-score") +
@@ -94,4 +98,35 @@ ggplot(df_mat) +
     axis.title.y = element_blank()
   ) + 
   coord_fixed()
+```
+
+## Reformat and save
+
+```{r save}
+#| fig-column: body-outset
+#| out-width: 100%
+
+# Keep only taxa and interaction strength.
+# Standardise intercation strength between -1 and 1, and assign negative values for organisms further away than expected.
+df_mat_ks <- df_mat_ks %>% 
+  mutate(
+    # standardise between 0 and 1
+    ks = (
+      kuiper_stat - min(kuiper_stat, na.rm = TRUE)) / 
+      (max(kuiper_stat, na.rm = TRUE) - min(kuiper_stat, na.rm = TRUE)),
+    # assign negative values for avoidance
+    ks = ifelse(dir == "further", -ks, ks)
+    ) %>% 
+  select(t1, t2, ks)
+
+ggplot(df_mat_ks) +
+  geom_tile(aes(x = t1, y = t2, fill = ks)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = NA) +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "KS\nint.") +
+  coord_fixed() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Save it
+save(df_mat_ks, file = "data/07.ks_matrix.Rdata")
 ```
