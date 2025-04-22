@@ -20,74 +20,57 @@ source("utils.R")
 
 ## Read saved distances
 
-List saved distances and ream them
+Read null distances and stats.
 
-```{r load}
-## Null distances
-load("data/02a.f_val_dist.Rdata")
-load("data/02b.rq_coef.Rdata")
-load("data/08.big_f_val_dist.Rdata")
+```{r read_null}
+load("data/04b.null_ks.Rdata")
+```
 
-## All plankton
-load("data/03.all_distances.Rdata")
+Read plankton distances and stats.
 
-## Apply log transformation for plotting
-f_val_dist <- f_val_dist %>% 
-  mutate(
-    log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
-  )
+```{r read_intra}
+load("data/05a.all_distances_ks.Rdata")
 
-big_f_val_dist <- big_f_val_dist %>% 
-  mutate(
-    log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
-  )
-
+# Log transform n dist and kuiper stat
 df_all <- df_all %>% 
   mutate(
     log_n_dist = log10(n_dist),
-    log_test_stat = log10(test_stat)
+    log_kuiper_stat = log10(kuiper_stat)
   )
+
 ```
 
-## Plot Kuiper statistics VS number of distances
+Read big null stats.
 
-```{r f_vs_n_dist}
-## Generate data to plot a ribbon between the regression lines
-# limits for n_dist
-lim_dist <- c(50, 2e9)
-# Generate ribbon
-rib_data <- tibble(n_dist = lim_dist) %>% 
+```{r read_acant}
+load("data/11a.null_ks_n_dist_big.Rdata")
+
+# Log-transform n_dist and kuiper_stat
+null_ks_n_dist_big <- null_ks_n_dist_big %>% 
   mutate(
-    # apply log-transformation
     log_n_dist = log10(n_dist),
-    # compute estimated kuiper-stat from slope and intercept
-    ymin = rq_coef %>% filter(tau == 0.05) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.05) %>% pull(intercept),
-    ymax = rq_coef %>% filter(tau == 0.95) %>% pull(slope) * log_n_dist + rq_coef %>% filter(tau == 0.95) %>% pull(intercept)
-  ) %>% 
-  # reformat and reorder to plot a polygon
-  pivot_longer(ymin:ymax, values_to = "y") %>% 
-  mutate(order = c(1, 2, 4, 3)) %>% 
-  arrange(order)
+    log_kuiper_stat = log10(kuiper_stat)
+    )
 
-## Plot results
-ggplot() +
-  geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray") +
-  geom_polygon(data = rib_data, aes(x = log_n_dist, y = y), alpha = 0.1) +
-  geom_point(data = big_f_val_dist, aes(x = log_n_dist, y = log_test_stat), colour = "black") +
-  geom_point(data = df_all, aes(x = log_n_dist, y = log_test_stat), colour = "red") +
-  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), expand = c(0, 0)) +
-  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
-  labs(x = "N distances", y = "Kuiper statistic")
 ```
 
--   black points:  3 pairs of big null datasets (on top of each other).
+## Plot Kuiper stat VS number of distances
 
--   red point: all plankton distances.
+```{r plot_comp}
 
-::: {.callout-tip icon="false"}
-## Conclusion
+ggplot() + 
+  geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = n_dist), colour = "grey", width = 0.3) +
+  #geom_boxplot(data = null_ks_n_dist_acant, aes(x = log_n_dist, y = log_kuiper_stat), width = 0.3) +
+  geom_point(data = null_ks_n_dist_big, aes(x = log_n_dist, y = log_kuiper_stat)) +
+  geom_point(data = df_all, aes(x = log_n_dist, y = log_kuiper_stat), colour = "red") +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) + 
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  labs(x = "N distances", y = "Kuiper statistic") 
+```
 
-Extrapolation of Kuiper stat on larger number of distances is OK.
+Black is big null (3 points on top of each ocher), grey is the global null data, red is observed plankton distances.
+
+::: {.callout-note appearance="simple" icon="false"}
+Null Kuiper statistics can be safely extrapolated for larger number of distances.
 :::

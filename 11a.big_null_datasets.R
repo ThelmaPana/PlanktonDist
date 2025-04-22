@@ -119,7 +119,7 @@ lapply(1:n_sets, function(i) {
     mutate(set = as.character(i))
   
   # Save it 
-  filename <- paste0("data/08a.distances_set_", i,".Rdata")
+  filename <- paste0("data/11a.distances_set_", i,".Rdata")
   write_parquet(dist_all_el, sink = filename)
   
   gc(verbose = FALSE)
@@ -129,7 +129,7 @@ lapply(1:n_sets, function(i) {
 ## Read saved distances and compute quantiles ----
 #--------------------------------------------------------------------------#
 # List of saved files
-files <- list.files(path = "data", pattern = "08a.", full.names = TRUE)
+files <- list.files(path = "data", pattern = "11a.", full.names = TRUE)
 # Number of distances, initially set to NULL
 n_dist <- NULL
 
@@ -143,13 +143,18 @@ df_quant <- lapply(files, function(file) {
   # Read file
   df_dist <- read_parquet(file)
   
+  # Convert from px to mm
+  df_dist <- df_dist |> mutate(dist = dist * 51 / 10000)
+  
+  # Apply distance threshold
+  df_dist <- df_dist |> filter(dist < dist_thr)
+  
   # Number of distances, compute it only once
   if(is.null(n_dist)) {n_dist <- nrow(df_dist)}
   
   # Compute quantiles
   df_dist <- quantile(df_dist$dist, probs = probs, names = FALSE)
-  gc(verbose = FALSE) # Memory cleaning
-
+  
   # Return quantiles
   df_dist
   
@@ -162,7 +167,7 @@ df_quant <- lapply(files, function(file) {
 set_pairs <- crossing(set_a = 1:n_sets, set_b = 1:n_sets) %>% filter(set_a < set_b)
 
 # Loop over pairs
-res <- lapply(1:nrow(set_pairs), function(i) {
+null_ks_n_dist_big <- lapply(1:nrow(set_pairs), function(i) {
   # Get sets of interest
   i_set_a <- set_pairs %>% slice(i) %>% pull(set_a)
   i_set_b <- set_pairs %>% slice(i) %>% pull(set_b)
@@ -175,7 +180,7 @@ res <- lapply(1:nrow(set_pairs), function(i) {
   # Return results
   tibble(
     n_dist = n_dist,
-    test_stat = kt[1],
+    kuiper_stat = kt[1],
     set_a = as.factor(i_set_a),
     set_b = as.factor(i_set_b)
   )
@@ -184,5 +189,5 @@ res <- lapply(1:nrow(set_pairs), function(i) {
 
 ## Save test results ----
 #--------------------------------------------------------------------------#
-save(res, file = "data/08.big_f_val_dist.Rdata")
+save(null_ks_n_dist_big, file = "data/11a.null_ks_n_dist_big.Rdata")
 
