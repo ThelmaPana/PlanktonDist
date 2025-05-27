@@ -107,7 +107,7 @@ ggsave(filename = "figures/null_dist.png", width = 60, height = 35, units = "mm"
 
 
 
-## Kuiper stat nor null data ----
+## Kuiper stat for null data ----
 #--------------------------------------------------------------------------#
 ggplot() +
   geom_boxplot(data = f_val_dist, aes(x = log_n_dist, y = log_test_stat, group = log_n_dist), colour = "gray", linewidth = 0.2) +
