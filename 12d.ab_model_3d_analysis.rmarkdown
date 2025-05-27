@@ -20,7 +20,9 @@ source("utils.R")
 source("utils_ab_model.R")
 ```
 
+
 ## Load data
+
 
 ```{r load}
 # Simulation results
@@ -33,11 +35,13 @@ plank_dist <- read_parquet("data/distances/02a.all_distances_plankton.parquet")
 load("data/04b.null_ks.Rdata")
 ```
 
+
 ## Model results
 
 ### Compare with all observations
 
 For both model and observations, apply distance threshold, extract 10000 quantiles and compute Kuiper stat.
+
 
 ```{r process_full}
 #| fig-column: body-outset
@@ -88,7 +92,9 @@ ggplot() +
   theme_classic()
 ```
 
+
 Let’s also plot distributions.
+
 
 ```{r plot_dist_full}
 #| fig-column: body-outset
@@ -108,9 +114,11 @@ ks_obs_mod %>%
 # NB: here the null is from the model
 ```
 
+
 ### Compare with subsample of observations
 
 Let’s redo the same analysis but this time we subsample observations to match the number of modeled distances.
+
 
 ```{r process_sub}
 #| fig-column: body-outset
@@ -151,7 +159,9 @@ ggplot() +
   theme_classic()
 ```
 
+
 Let’s plot distributions.
+
 
 ```{r plot_dist_sub}
 #| fig-column: body-outset
@@ -171,7 +181,9 @@ ks_obs_mod_sub %>%
 # NB: here the null is from the model
 ```
 
+
 ## Save quantiles
+
 
 ```{r save}
 # Use results from all observations
@@ -182,3 +194,4 @@ df_ab_qt <- ks_obs_mod %>%
   mutate(type = str_remove(type, "_qt"))
 save(df_ab_qt, file = "data/12d.df_ab_qt.Rdata")
 ```
+

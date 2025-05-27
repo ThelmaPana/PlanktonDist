@@ -33,9 +33,6 @@ Let’s familiarise ourselves with model parameters:
 Let’s take just one image as an example and see the effect of both `h` and `d_length`.
 
 ```{r gen_image}
-#| fig-column: body-outset
-#| out-width: 100%
-
 set.seed(seed)
 # Generate an image with organisms in 3D and plot it in 2D
 df <- tibble(
@@ -61,9 +58,6 @@ ggplot(df) +
 Let’s compute density with various bandwidth values and plot results.
 
 ```{r dens_bandwidth}
-#| fig-column: body-outset
-#| out-width: 100%
-
 # List of bandwidth values to try
 h_values <- c(10000, 50000, 100000, 500000)
 
@@ -101,17 +95,13 @@ Sane values are between `100000` and `400000`.
 
 #### Convert to sensory radius in cm
 
-Let’s translate these `r h` values into meaningful sensory radius in centimetres.
+Let’s translate these `h` values into meaningful sensory radius in centimetres.
 
 Try to find the equivalent sensory radius in cm.
 
 For this we generate an image with only 1 point at the center. We compute density using various bandwidth values and assess the decrease in density when going away from the point.
 
 ```{r comp_bandwidth}
-#| fig-column: body-outset
-#| out-width: 100%
-#| fig.height: 3
-
 # Generate 1 image with 1 central point
 df_one <- tibble(x = vol$x / 2, y = vol$y / 2, z = vol$z / 2)
 # Plot image
@@ -172,10 +162,6 @@ ggplot(dens_dist) +
 Let’s now find the distance after which density is \~null, i.e. the x value for which the AUC is 99% of the total AUC.
 
 ```{r auc_dist}
-#| fig-column: body-outset
-#| out-width: 100%
-
-library(bayestestR)
 # Distances values  
 unique_dist <- dens_dist %>% select(dist) %>% unique()
   
@@ -240,7 +226,7 @@ ggplot(dist_sens, aes(x = dist, y = h)) +
 # Looks like an x³ relationship, let’s fit it
 
 # Fit a degree 3 polynom
-mod_sr <- lm(h ~ poly(dist, 3, raw = TRUE), toto)
+mod_sr <- lm(h ~ poly(dist, 3, raw = TRUE), dist_sens)
 summary(mod_sr)
 # Very good fit indeed
 tidy(mod_sr)
@@ -251,9 +237,6 @@ We will use model coefficients later for the conversion.
 ### Displacement length
 
 ```{r d_length}
-#| fig-column: body-outset
-#| out-width: 100%
-
 # List of displacement values to try (in px)
 d_length_values <- c(50, 100, 300, 500)
 (d_length_values * 51)/10000 # to see equivalent in cm

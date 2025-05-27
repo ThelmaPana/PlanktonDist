@@ -365,6 +365,9 @@ ggplot(best_mods) +
 
 # Extract the winning model
 best_mod <- best_mods %>% count(d_length_cm, sr) %>% arrange(desc(n)) %>% slice(1)
+
+# Save for future plots
+save(best_mods, file = "data/12c.best_mods.Rdata")
 ```
 
 Let’s now replot modeled distances VS all observations.
