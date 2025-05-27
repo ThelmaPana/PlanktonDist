@@ -10,13 +10,13 @@ editor: visual
 lightbox: true
 execute:
   warning: false
-  cache: true
+  cache: false
   freeze: false
 ---
 
 Let’s use the agent-based model positions that are representative of plankton position and arbitrary remove some points to simulate lower recall, recompute distances and check if they are representative of overall distances.
 
-Let’s use data from the simulation to learn the relationship between points recall and distance recall.
+First, we need to learn the relationship between points recall and distance recall, because these values are not equivalent. For example, in an image with 10 points, we initially have 45 (10×9/2) unique distances. If we remove one point, the point recall is now 90%, but we now have 36 (9×8/2) distances, corresponding to a distance recall of 80% (36/45). By knowing the distance recall for each point recall, we can directly subsample computed distances.
 
 ```{r set_up}
 #|cache: false
@@ -65,14 +65,13 @@ For each recall value, we:
 
 -   get distances between remaining points
 
-```{r process}
+```{r process_dist_rec}
 # Recall values to try
 recall_values <- seq(0.1, 1, by = 0.1)
 
-rec_val <- recall_values[1]
 
 # Loop over recall values
-bar <- lapply(recall_values, function(rec_val) {
+rec_dist_pt <- lapply(recall_values, function(rec_val) {
   print(rec_val)  
   
   # Subsample points (i.e. apply recall)
@@ -105,11 +104,11 @@ Let’s check how the distance recall varies with points recall.
 
 ```{r plot_dist_point_recall}
 # Compute number and proportion of retained distances
-baz <- bar %>% 
+rec_summ <- rec_dist_pt %>% 
   count(rec_val, name = "n_dist") %>% 
   mutate(prop_dist = n_dist / max(n_dist))
 
-ggplot(baz) +
+ggplot(rec_summ) +
   geom_path(aes(x = rec_val, y = prop_dist)) + 
   geom_abline(slope = 1, intercept = 0, colour = "grey") +
   xlim(0, 1) + ylim(0, 1) +
@@ -132,10 +131,10 @@ Similarly as before, for each recall value, we:
 
 ```{r process}
 # Loop over recall values
-rec_dist <- lapply(1:nrow(baz), function(i) {
+rec_dist <- lapply(1:nrow(rec_summ), function(i) {
   print(i)
   # Get row
-  r <- baz %>% slice(i)
+  r <- rec_summ %>% slice(i)
   
   # Subsample plankton distances
   s_plankton_dist <- plankton_dist %>% slice_sample(prop = r$prop_dist)
@@ -195,6 +194,12 @@ ggplot() +
 ::: callout-note
 The KS value is barely affected by recall. Given the number of observations, it’s fine!
 :::
+
+Save for future plots.
+
+```{r save}
+save(rec_dist, file = "data/13.rec_dist.Rdata")
+```
 
 ## Look at recall values in the dataset
 
