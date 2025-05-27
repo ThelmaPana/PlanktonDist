@@ -9,7 +9,7 @@ editor: visual
 lightbox: true
 execute:
   warning: false
-  cache: true
+  cache: false
   freeze: false
 ---
 
@@ -142,3 +142,18 @@ The refined threshold indicates a maximum of information when considering distan
 
 Let’s focus of distances below 11 cm.
 :::
+
+Save all for future plots.
+
+```{r save}
+all_thr <- bind_rows(
+  coarse_thr,
+  fine_thr  
+)
+save(all_thr, file = "data/03a.all_thr.Rdata")
+
+ggplot(all_thr) +
+  geom_point(aes(x = dist_thres, y = kuiper_stat)) +
+  geom_vline(xintercept = all_thr %>% arrange(desc(kuiper_stat)) %>% slice(1) %>% pull(dist_thres), colour = "red") +
+  labs(x = "Distance threshold (cm)", y = "Kuiper statistic")
+```

@@ -33,9 +33,11 @@ if (sub_sample){ # with subsampling
 # List pairs groups
 pairs <- str_split_fixed(saved, "_", n = 3)[,3] %>% str_remove_all(".parquet")
 
-# Remove colonial Collodaria (segmentation artifact)
+# Remove colonial Collodaria (segmentation artifact) and Rhizaria
 pairs <- pairs[!str_detect(pairs, "Collodaria_colonial")]
 saved <- saved[!str_detect(saved, "Collodaria_colonial")]
+pairs <- pairs[!str_detect(pairs, "Rhizaria")]
+saved <- saved[!str_detect(saved, "Rhizaria")]
 
 # Thresholds to try
 thres <- seq(5, 20, by = 1)
@@ -45,7 +47,7 @@ thres <- seq(5, 20, by = 1)
 
 Here we focus on distances between 5 and 20 cm with an increment of 1 cm, as 11 cm was found as the optimal threshold when focusing on all distances regardless of taxonomy.
 
-For each taxonomic group, we:
+For each pair, we:
 
 -   filter distances
 
@@ -54,7 +56,8 @@ For each taxonomic group, we:
 -   perform Kuiper test
 
 ```{r fine_thr_taxa}
-saved_sub <- sample(saved, size = 100)
+#saved_sub <- sample(saved, size = 100)
+saved_sub <- saved
 
 inter_thr <- lapply(saved_sub, function(file_name) {
   # Get taxon for given file
@@ -144,12 +147,24 @@ Now find the optimal for each taxon and plot it VS the number of distances. Add 
 ```{r plot_opt}
 #| fig-column: body-outset
 #| out-width: 100%
+
+# For each pair, find the threshold that maximizes the Kuiper statistic
 inter_opt <- inter_thr %>% 
   group_by(pair) %>% 
   filter(kuiper_stat == max(kuiper_stat)) %>% 
   ungroup()
 
-ggplot(inter_opt) +
+# As for intra group thresholds, make sure we have a unique threshold per per
+# If multiple thresholds for a given pair, take the smallest one
+inter_opt <- inter_opt %>% 
+  add_count(pair) %>% 
+  group_by(n) %>% 
+  filter(n == 1 | (n == 2 & dist_thres == min(dist_thres))) %>% 
+  ungroup() %>% 
+  select(-n)
+
+# Plot final result
+ggplot(inter_opt %>% filter(n_dist > n_dist_min)) +
   geom_hline(yintercept = 11, colour = "grey") +
   geom_point(aes(x = n_dist, y = dist_thres)) +
   labs(x = "Number of distances", y = "Identified threshold (cm)") +
@@ -157,6 +172,12 @@ ggplot(inter_opt) +
 ```
 
 As long as enough distances are available, the identified threshold is around 11 cm.
+
+```{r save}
+# Save it
+save(inter_opt, file = "data/03c.inter_opt.Rdata")
+save(inter_thr, file = "data/03c.inter_thr.Rdata")
+```
 
 ::: callout-note
 ## Conclusion

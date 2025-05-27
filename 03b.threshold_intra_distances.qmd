@@ -33,9 +33,11 @@ if (sub_sample){ # with subsampling
 # List taxonomic groups
 taxa <- str_split_fixed(saved, "_", n = 3)[,3] %>% str_remove_all(".parquet")
 
-# Remove colonial Collodaria (segmentation artifact)
+# Remove colonial Collodaria (segmentation artifact) and Rhizaria
 taxa <- taxa[!str_detect(taxa, "Collodaria_colonial")]
 saved <- saved[!str_detect(saved, "Collodaria_colonial")]
+taxa <- taxa[!str_detect(taxa, "Rhizaria")]
+saved <- saved[!str_detect(saved, "Rhizaria")]
 
 # Thresholds to try
 thres <- seq(5, 20, by = 1)
@@ -119,19 +121,55 @@ Now find the optimal for each taxon and plot it VS the number of distances. Add 
 ```{r plot_opt}
 #| fig-column: body-outset
 #| out-width: 100%
+
+# For each taxon, find the threshold that maximizes the Kuiper statistic
 intra_opt <- intra_thr %>% 
   group_by(taxon) %>% 
   filter(kuiper_stat == max(kuiper_stat)) %>% 
   ungroup()
 
+# Plot it VS number of retained distances
 ggplot(intra_opt) +
   geom_hline(yintercept = 11, colour = "grey") +
-  geom_point(aes(x = n_dist, y = dist_thres)) +
-  labs(x = "Number of distances", y = "Identified threshold (cm)") +
+  geom_point(aes(x = n_dist, y = dist_thres, colour = taxon)) +
+  labs(x = "Number of distances", y = "Identified threshold (cm)", colour = "Taxon") +
+  scale_x_log10()
+
+# Focus on cases for which we have > 10,000 distances
+ggplot(intra_opt %>% filter(n_dist > n_dist_min)) +
+  geom_hline(yintercept = 11, colour = "grey") +
+  geom_point(aes(x = n_dist, y = dist_thres, colour = taxon)) +
+  labs(x = "Number of distances", y = "Identified threshold (cm)", colour = "Taxon") +
+  scale_x_log10()
+```
+
+Two thresholds were identified for `Cop_other`: 11 and 12 cm. Let’s keep the one with fewer distances, i.e. 11 cm.
+
+```{r keep_cop_other}
+intra_opt <- intra_opt %>% 
+  add_count(taxon) %>% 
+  group_by(n) %>% 
+  filter(n == 1 | (n == 2 & dist_thres == min(dist_thres))) %>% 
+  ungroup() %>% 
+  select(-n)
+
+# Plot final result
+ggplot(intra_opt %>% filter(n_dist > n_dist_min)) +
+  geom_hline(yintercept = 11, colour = "grey") +
+  geom_point(aes(x = n_dist, y = dist_thres, colour = taxon)) +
+  labs(x = "Number of distances", y = "Identified threshold (cm)", colour = "Taxon") +
   scale_x_log10()
 ```
 
 As long as enough distances are available, the identified threshold is around 11 cm.
+
+Save everything.
+
+```{r save}
+# Save it
+save(intra_opt, file = "data/03b.intra_opt.Rdata")
+save(intra_thr, file = "data/03b.intra_thr.Rdata")
+```
 
 ::: callout-note
 ## Conclusion
