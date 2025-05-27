@@ -227,3 +227,44 @@ df_period %>%
   labs(x = "Distance (cm)", y = "Density", colour = "Period") +
   theme_classic()
 ```
+
+## Compute day VS night Kuiper statistic
+
+```{r day_night_kuiper}
+# Extract day and night quantiles
+day_qt <- df_period %>% 
+  select(period, plank_qt) %>% 
+  filter(period %in% c("day", "night")) %>% 
+  unnest(plank_qt) %>% 
+  filter(period == "day") %>% 
+  pull(plank_qt)
+
+night_qt <- df_period %>% 
+  select(period, plank_qt) %>% 
+  filter(period %in% c("day", "night")) %>% 
+  unnest(plank_qt) %>% 
+  filter(period == "night") %>% 
+  pull(plank_qt)
+
+# Compute Kuiper stat
+kt_dn <- kuiper_stat(day_qt, night_qt)
+kt_dn
+
+# Get initial number of day and night distances
+n_dist_day <- df_period %>% filter(period == "day") %>% pull(n_dist)
+n_dist_night <- df_period %>% filter(period == "night") %>% pull(n_dist)
+# Average both
+n_dist <- mean(n_dist_day, n_dist_night)
+
+# Plot Kuiper stat VS number of distances
+# Red point is diff between day and night
+ggplot() +
+  geom_point(aes(x = log10(n_dist), y = log10(kt_dn)), colour = "red") +
+  geom_polygon(data = null_ks_rib, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  geom_point(data = df_period, aes(x = log_n_dist, y = log_kuiper_stat, colour = period)) +
+  scale_colour_manual(values = cols) +
+  labs(x = "N distances", y = "Kuiper statistic", colour = "Period") +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
+  theme_classic()
+```

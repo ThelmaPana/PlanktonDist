@@ -9,6 +9,9 @@ library(hms)
 library(ecotaxarapi)
 library(unix)
 library(castr)
+library(furrr)
+library(vegan)
+library(MLmetrics)
 
 
 # Null hypothesis
@@ -22,6 +25,7 @@ library(arrow)
 
 # Spatial point pattern
 library(spatstat)
+library(bayestestR)
 
 # Plots
 library(gridExtra)
@@ -33,6 +37,10 @@ library(scales)
 library(ggtext)
 library(paletteer)
 library(khroma)
+library(chroma)
+library(ggrepel)
+library(geomtextpath)
+
 
 
 theme_set(theme_minimal())
@@ -276,3 +284,45 @@ get_corr <- function(t1, t2, abundance_mat, taxa_indices, method = "spearman", l
   }
 }
 
+#' Get Correlation and P-Value Between Two Taxa
+#'
+#' This function computes the correlation between the abundances of two taxa and returns both
+#' the correlation value and the p-value. It provides options to choose the correlation method
+#' (Pearson or Spearman) and log-transform the abundances.
+#'
+#' @param t1 A character string representing the first taxon.
+#' @param t2 A character string representing the second taxon.
+#' @param abundance_mat A matrix where rows represent different taxa and columns represent samples. The values in the matrix correspond to the abundances of each taxon in each sample.
+#' @param taxa_indices A named list where names correspond to taxon names and values are the row indices of those taxa in `abundance_mat`.
+#' @param method A character string specifying the correlation method to use. Options are `"pearson"` or `"spearman"` (default) .
+#' @param log_transform A logical value indicating whether to log-transform the abundances before calculating correlation. Default is `FALSE`. The log transformation applied is `log(abundance + 1)` to avoid issues with zeros.
+#'
+#' @return A list containing:
+#'   - `corr`: A numeric value representing the correlation between the two taxa, or `NA` if the taxa have zero variance or are identical.
+#'   - `p_val`: The associated p-value of the correlation test, or `NA` if variance is zero.
+#'
+get_corr_pval <- function(t1, t2, abundance_mat, taxa_indices, method = "spearman", log_transform = FALSE) {
+  idx1 <- taxa_indices[[t1]]
+  idx2 <- taxa_indices[[t2]]
+  ab_t1 <- abundance_mat[idx1, ]
+  ab_t2 <- abundance_mat[idx2, ]
+  
+  # Log-transform the abundances if specified
+  if (log_transform) {
+    ab_t1 <- log1p(ab_t1)  # log1p to avoid log(0) issues
+    ab_t2 <- log1p(ab_t2)
+  }
+  
+  # Check for zero variance
+  if (sd(ab_t1) == 0 || sd(ab_t2) == 0) {
+    return(list(correlation = NA, p_value = NA))  # Return NA if variance is zero
+  }
+  
+  # Compute correlation if taxa are different
+  if (t1 != t2) {
+    cor_test <- cor.test(ab_t1, ab_t2, method = method, exact = FALSE)
+    return(list(corr = cor_test$estimate, p_val = cor_test$p.value))
+  } else {
+    return(list(corr = NA, p_val = NA))
+  }
+}
