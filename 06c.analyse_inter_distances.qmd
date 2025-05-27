@@ -252,6 +252,28 @@ ggplot(ecdfs_inter %>% filter(pair %in% pairs_further$pair)) +
   facet_wrap(~pair, scales = "free", ncol = 3)
 ```
 
+### Plot quantile difference VS  distance percentile
+
+```{r qt_diff_vs_dist_perc}
+# Plot differences in quantiles
+df_inter_qt <- df_inter_dist %>% 
+  mutate(type = str_to_lower(type)) %>% 
+  group_by(pair, type) %>% # separately for plankton and null
+  reframe(dist = quantile(dist, probs = seq(0, 1, by = 0.01))) %>% # compute percentiles
+  pivot_wider(names_from = type, values_from = dist, values_fn = list) %>% # plankton and null quantiles in two columns
+  unnest(c(plankton, null)) %>% 
+  mutate(
+    diff = null - plankton, # compute difference between null and plankton quantiles
+    x_axis = rep(seq(0, 1, by = 0.01), length.out = n()) # add percentiles for X axis sequence, 
+  )
+
+ggplot(df_inter_qt) +
+  geom_hline(yintercept = 0, colour = "grey", linewidth = 1) +
+  geom_path(aes(x = x_axis, y = diff, group = pair), alpha = 0.2) +
+  labs(x = "Percentiles", y = "Null quantiles - plankton quantiles (cm)") +
+  theme_classic()
+```
+
 Let’s now compute the interaction strength and confidence for each pair.
 
 ### Interaction strength & confidence
@@ -316,26 +338,9 @@ df_inter_scores %>%
 
 Save Z-score and Kuiper stat.
 
+Save quantiles, Z-score and Kuiper stat.
+
 ```{r save}
+save(df_inter_qt, file = "data/06c.df_inter_qt.Rdata")
 save(df_inter_scores, file = "data/06c.df_inter_scores.Rdata")
-```
-
-Plot differences in quantiles.
-
-```{r plot_qt_diff}
-df_inter_dist %>% 
-  mutate(type = str_to_lower(type)) %>% 
-  group_by(pair, type) %>% # separately for plankton and null
-  reframe(dist = quantile(dist, probs = seq(0, 1, by = 0.01))) %>% # compute percentiles
-  pivot_wider(names_from = type, values_from = dist, values_fn = list) %>% # plankton and null quantiles in two columns
-  unnest(c(plankton, null)) %>% 
-  mutate(
-    diff = null - plankton, # compute difference between null and plankton quantiles
-    x_axis = rep(seq(0, 1, by = 0.01), length.out = n()) # add percentiles for X axis
-    ) %>% 
-  ggplot() +
-  geom_hline(yintercept = 0, colour = "grey", linewidth = 1) +
-  geom_path(aes(x = x_axis, y = diff, group = pair), alpha = 0.2) +
-  labs(x = "Percentiles", y = "Null quantiles - plankton quantiles (cm)") +
-  theme_classic()
 ```
