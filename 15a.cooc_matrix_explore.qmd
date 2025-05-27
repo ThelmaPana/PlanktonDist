@@ -50,10 +50,6 @@ ggplot(plankton_counts) +
   theme_classic()
 ```
 
-::: callout-note
-Distribution of abundances is somehow log-normal.
-:::
-
 First, we need to generate an abundance matrix, i.e. combination of all images by taxonomic groups.
 
 ## Explore co-occurrences
@@ -98,7 +94,7 @@ taxa_indices <- setNames(1:nrow(mat_1), taxa)
 
 # Compute correlations
 df_corr_1 <- df_corr_1 %>%
-  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_1, taxa_indices, method = "pearson", log_transform = FALSE)))
+  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_1, taxa_indices, method = "spearman", log_transform = FALSE)))
 
 # Plot matrix of correlations
 ggplot(df_corr_1) +
@@ -152,7 +148,7 @@ taxa_indices <- setNames(1:nrow(mat_2), taxa)
 
 # Compute correlations
 df_corr_2 <- df_corr_2 %>%
-  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_2, taxa_indices, method = "pearson", log_transform = FALSE)))
+  mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat_2, taxa_indices, method = "spearman", log_transform = FALSE)))
 
 # Plot matrix of correlations
 ggplot(df_corr_2) +
@@ -220,8 +216,18 @@ df_corr <- mclapply(1:(n_blocks*n_rep), function(i) {
   
   # Compute correlations
   df_corr <- df_corr %>%
-    mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "pearson", log_transform = FALSE))) %>% 
+    mutate(corr = map2_dbl(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "spearman", log_transform = FALSE))) %>% 
     mutate(idx = i) # index label, will be used to recover block / repetition
+  
+  # Compute correlations with p-value
+  #df_corr <- df_corr %>%
+  #  mutate(
+  #    corr_results = map2(t1, t2, ~get_corr(.x, .y, mat, taxa_indices, method = "spearman", log_transform = FALSE)),
+  #    corr = map_dbl(corr_results, "corr"),
+  #    p_value = map_dbl(corr_results, "p_value"),
+  #    idx = i # index label, will be used to recover block / repetition
+  #    ) %>%
+  #  select(-corr_results) 
   
   return(df_corr)
 }, mc.cores = n_cores) %>% 
@@ -384,43 +390,37 @@ df_corr_met_avg %>%
 It seems that the type of correlation does not affect much the results.
 :::
 
-## Final results
+## Final results and standardisation
 
 Let’s use pearson correlation on log-transformed data.
 
 ```{r summary_final}
-# Compute mean and sd of correlation within each block
-df_mat_cooc <- df_corr_met %>% 
+# Compute mean of correlation
+df_cooc <- df_corr_met %>% 
   group_by(t1, t2) %>% 
   summarise(
     mean_corr = mean(corr_pea_log, na.rm = TRUE),
-    sd_corr = sd(corr_pea_log, na.rm = TRUE),
     .groups = "drop"
   )
+```
+
+The last step is to standardize the values into the \[-1; 1\] range, using (x - min(x)) / (max(x) - min(x)).
+
+```{r stand}
+df_cooc <- df_cooc %>% 
+  mutate(
+    cooc_int = (mean_corr - min(abs(mean_corr), na.rm = TRUE)) / (max(abs(mean_corr), na.rm = TRUE) - min(abs(mean_corr), na.rm = TRUE))
+    ) %>% 
+  select(-mean_corr)
 ```
 
 Let’s plot mean and sd.
 
 ```{r plot_mean}
-#| fig-column: body-outset
-#| out-width: 100%
-
-ggplot(df_mat_cooc) +
-  geom_tile(aes(x = t1, y = t2, fill = mean_corr)) +
-  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = "grey90") +
-  labs(x = "Taxon 1", y = "Taxon 2", fill = "Mean\ncorr.") +
-  coord_fixed() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-```{r plot_sd}
-#| fig-column: body-outset
-#| out-width: 100%
-
-ggplot(df_mat_cooc) +
-  geom_tile(aes(x = t1, y = t2, fill = sd_corr)) +
-  scale_fill_viridis_c(na.value = "grey90") +
-  labs(x = "Taxon 1", y = "Taxon 2", fill = "Sd\ncorr.") +
+ggplot(df_cooc) +
+  geom_tile(aes(x = t1, y = t2, fill = cooc_int)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", na.value = "grey90") +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Cooc.\nint.") +
   coord_fixed() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -431,38 +431,5 @@ Save the resulting co-occurrence matrix.
 
 ```{r save}
 # Save results
-save(df_mat_cooc, file = "data/15.co_occurrence_matrix.Rdata")
-```
-
-## Interpretation
-
-Let’s look for high correlations.
-
-```{r high_corr}
-#| fig-column: body-outset
-#| out-width: 100%
-
-corr_thr <- 0.1 # correlation threshold to consider
-
-df_mat_cooc_thr <- df_mat_cooc %>% 
-  mutate(mean_corr = ifelse(abs(mean_corr) > corr_thr, mean_corr, NA))
-
-ggplot(df_mat_cooc_thr) +
-  geom_tile(aes(x = t1, y = t2, fill = mean_corr)) +
-  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = NA) +
-  labs(x = "Taxon 1", y = "Taxon 2", fill = "Mean\ncorr.") +
-  coord_fixed() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-Let’s list negative correlations.
-
-```{r list_neg}
-df_mat_cooc_thr %>% filter(mean_corr < 0) %>% arrange(desc(abs(mean_corr)))
-```
-
-And positive correlations.
-
-```{r list_pov}
-df_mat_cooc_thr %>% filter(mean_corr > 0) %>% arrange(desc(abs(mean_corr)))
+save(df_cooc, file = "data/15.co_occurrence_matrix.Rdata")
 ```

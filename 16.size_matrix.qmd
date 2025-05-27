@@ -1,0 +1,400 @@
+---
+title: "Build an empirical interaction matrix constrained by size of organisms."
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+#| echo: false
+#| warning: false
+source("utils.R")
+```
+
+## Read data
+
+```{r read}
+#| cache: false
+# Read plankton and images
+plankton <- read_parquet("data/00.plankton_clean.parquet") # no need to use the X correction here
+#images <- read_parquet("data/00.images_clean.parquet")
+
+# List taxonomic groups
+taxa <- plankton %>% select(taxon) %>% distinct() %>% pull(taxon) %>% sort()
+# Drop unwanted groups
+taxa <- setdiff(taxa, c("Collodaria_colonial", "Rhizaria"))
+plankton <- plankton %>% filter(taxon %in% taxa)
+
+# Convert ESD from px to mm
+plankton <- plankton %>% mutate(esd = esd * 51 / 1000)
+```
+
+## Explore ESD values per taxonomic group
+
+```{r plot_esd}
+#| fig-height: 6
+#| fig-width: 4
+#| fig-align: center
+#| cache-lazy: false
+
+# Compute median ESD for each group for a nice ordered plot
+plankton <- plankton %>% 
+  group_by(taxon) %>% 
+  mutate(median_esd = median(esd)) %>% 
+  ungroup()
+
+ggplot(plankton) +
+  geom_boxplot(aes(x = fct_reorder(taxon, median_esd), y = esd), outlier.size = 0.5) +
+  scale_y_log10() +
+  labs(x = "Taxon", y = "ESD (mm)") +
+  coord_flip() +
+  theme_classic()
+```
+
+## Explore predator:prey size ratios
+
+For a predator to feed on a prey, it typically has to be larger than the prey. Actually, there is an optimal predator to prey size ratio (PPSR) for each predator.
+
+Let’s start with a given taxon as predator, with a given optimal PPSR. Let’s choose another taxon as prey. To estimate how likely the predator is to feed on the prey, we can use size distributions to compute the probability that the PPSR falls in the optimal range. For this, we randomly select 10,000 organisms in the predator taxon and 10,000 organisms in the prey taxon. We then compute 10,000 PPSR values, and count how many of them fall in the optimal range.
+
+We’ll try various PPSR ranges, centred on values from 2 to 10, on a log-scale:
+
+-   \[5; 20\], centred on 10
+
+-   \[4; 16\], centred on 8
+
+-   \[3; 12\], centred on 6
+
+-   \[2; 8\], centred on 4
+
+-   \[1; 4\], centred on 2
+
+```{r ppsr_comp}
+#| cache-lazy: false
+
+# Set up parallel processing plan
+plan(multisession, workers = 8)
+
+# Number of objects to randomly sample in each group
+n_sam <- 10000
+
+# Pre-sample each taxon in advance and store results in a list
+sampled_plankton <- plankton %>%
+  group_by(taxon) %>%
+  slice_sample(n = n_sam) %>%
+  ungroup() %>%
+  select(taxon, esd) %>%
+  group_by(taxon)
+sampled_plankton <- sampled_plankton %>% 
+  group_split() %>%
+  set_names(unlist(group_keys(sampled_plankton)))   # Named list for easy access by taxon name
+
+# Generate all possible predator-prey pairs and expand for each opt_pp range
+taxa_pairs <- crossing(predator = taxa, prey = taxa) %>%
+  #filter(predator != prey) %>%
+  mutate(opt_pp = list(list(c(5, 20), c(4, 16), c(3, 12), c(2, 8), c(1, 4)))) %>%
+  unnest(opt_pp)  # Flatten list to duplicate rows per each opt_pp range
+
+# Create the plankton subsets for each predator-prey pair by pulling from pre-sampled data
+taxa_pairs <- taxa_pairs %>%
+  mutate(
+    plankton_subset = map2(predator, prey, ~bind_rows(
+      sampled_plankton[[.x]] %>% 
+        slice_sample(n = min(nrow(sampled_plankton[[.x]]), nrow(sampled_plankton[[.y]]))) %>% 
+        mutate(taxon = paste0(taxon, "_pred")) %>% 
+        mutate(id = 1:n()),
+      sampled_plankton[[.y]] %>% 
+        slice_sample(n = min(nrow(sampled_plankton[[.x]]), nrow(sampled_plankton[[.y]]))) %>% 
+        mutate(taxon = paste0(taxon, "_prey")) %>% 
+        mutate(id = 1:n())
+    ))
+  ) %>% 
+  # Add a flag for each taxon as predator or prey
+  mutate(
+    predator = paste0(predator, "_pred"),
+    prey = paste0(prey, "_prey")
+  )
+
+# Helper function to calculate proportion in a single optimal range for a predator-prey pair
+calc_prop_pp_in <- function(predator, prey, opt_pp_range, plankton_subset) {
+  plankton_subset %>%
+    pivot_wider(names_from = taxon, values_from = esd) %>%
+    mutate(
+      pp = .data[[predator]] / .data[[prey]], 
+      pp_in = between(pp, opt_pp_range[1], opt_pp_range[2])
+    ) %>%
+    summarise(prop_pp_in = mean(pp_in, na.rm = TRUE)) %>%
+    pull(prop_pp_in)
+}
+
+# Apply the function in parallel using future_pmap_dbl to handle each opt_pp range separately
+prop_ppsr <- taxa_pairs %>%
+  mutate(
+    prop_pp_in = future_pmap_dbl(
+      list(predator, prey, opt_pp, plankton_subset),
+      calc_prop_pp_in
+    )
+  ) %>%
+  select(predator, prey, opt_pp, prop_pp_in)%>% 
+  mutate(opt_pp = paste0(opt_pp) %>% fct_inorder()) %>% 
+  mutate(
+    predator = str_remove(predator, "_pred"),
+    prey = str_remove(prey, "_prey")
+  )
+
+# Shut down the parallel plan
+plan(sequential)
+
+# Summary of results
+summary(prop_ppsr)
+```
+
+We can plot the distribution of the proportion of PPSR falling in the optimal range for each range value.
+
+```{r plot_ppsr_dist}
+#| fig-height: 6
+#| fig-width: 4
+#| fig-align: center
+
+ggplot(prop_ppsr) + 
+  geom_density(aes(x = prop_pp_in)) +
+  xlim(0, 1) +
+  labs(x = "Proportion in optimal PPSR", y = "Density") +
+  facet_wrap(~opt_pp, scales = "free", ncol = 1) +
+  theme_classic()
+```
+
+We can also plot these values in a matrix.
+
+```{r plot_ppsr_mat}
+#| fig-width: 10
+#| fig-height: 12
+#| fig-align: center
+
+ggplot(prop_ppsr) +
+  geom_tile(aes(x = predator, y = prey, fill = prop_pp_in)) +
+  scale_fill_viridis_c(limits = c(0, 1)) +
+  labs(x = "Predator", y = "Prey", fill = "Prop.\nin opt.\npred:prey") +
+  coord_fixed() +
+  facet_wrap(~opt_pp, ncol = 2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Separate positive and negative interactions
+
+By construction, the computed values are in the range \[0; 1\]. As for other matrices (distance-based and co-occurrence), it is desirable to separate between positive and negative interactions. To set this threshold, we can have a look at what happens when we randomly sample two series of 10,000 objects, compute 10,1000 PPSR values and see the proportion that falls into considered size ranges.
+
+```{r sep_pos_neg}
+# Randomly sample 10,000 predators and prey
+set.seed(1)
+rand_pred <- plankton %>% slice_sample(n = 10000)
+rand_prey <- plankton %>% slice_sample(n = 10000)
+
+# Compute PPSR (predator / prey)
+df_rand <- tibble(
+  pred_esd = rand_pred$esd,
+  prey_esd = rand_prey$esd
+) %>% 
+  mutate(ppsr = pred_esd / prey_esd)
+
+summary(df_rand) # Median PPSR is 1 by definition
+
+# Compute proportion of PPSR falling into each optimal range
+df_rand_prop <- df_rand %>% 
+  # cross with optimize ranges
+  crossing(
+    tibble(opt_pp = list(c(5, 20), c(4, 16), c(3, 12), c(2, 8), c(1, 4))) %>% 
+      mutate(opt_label = paste0(opt_pp)) %>%  # Preserve label
+      unnest_wider(opt_pp, names_sep = "") %>% 
+      rename(min = opt_pp1, max = opt_pp2)
+  ) %>% 
+  # flag if ppsr is within the optimal range
+  mutate(in_pp = between(ppsr, min, max)) %>% 
+  # compute proportion of ppsr in optimal range per range
+  group_by(opt_pp = fct_inorder(opt_label)) %>% 
+  summarise(rand_prop = mean(in_pp), .groups = "drop")
+df_rand_prop
+```
+
+Interpretation:
+
+-   in the size range `r df_rand_prop[1,] %>% pull(opt_pp) %>% as.character()` , `r percent(df_rand_prop[1,] %>% pull(rand_prop), accuracy = 0.1)` of PPSR fall in the optimal size range
+
+-   in the size range `r df_rand_prop[3,] %>% pull(opt_pp) %>% as.character()` , `r percent(df_rand_prop[3,] %>% pull(rand_prop), accuracy = 0.1)` of PPSR fall in the optimal size range
+
+-   in the size range `r df_rand_prop[5,] %>% pull(opt_pp) %>% as.character()` , `r percent(df_rand_prop[5,] %>% pull(rand_prop), accuracy = 0.1)` of PPSR fall in the optimal size range
+
+Thus, for a given size range, for a given pair, if the proportion of PPSR is less than this random proportion, we can assume a negative predation interaction for this pair. On the opposite, if the proportion of PPSR is higher than the random proportion, we can assume a positive predation interaction. Let’s integrate these random proportion into the matrices to flag negative and positive predation interaction.
+
+Then, we can use two different ways to correct the matrices:
+
+-   ratio between the proportion of PPSR in the optimal range divided by the random proportion:  values \< 1 indicate negative interaction, values \> 1 indicate positive interaction
+
+-   difference between the proportion of PPSR in the optimal range and the random proportion:  values \< 0 indicate negative interaction, values \> 0 indicate positive interaction
+
+Let’s focus on difference now. First we compute it, and then we standardize it in the \[-1; 1\] range for each size range.
+
+```{r correct_mat}
+# Join computed PPSR proportions with random ones
+prop_ppsr <- prop_ppsr %>% 
+  left_join(df_rand_prop, by = join_by(opt_pp)) %>% 
+  mutate(
+    size_int = prop_pp_in - rand_prop, # difference between computed and random prop
+    direction = ifelse(size_int > 0, "pos", "neg") # direction of interaction
+  ) 
+
+# For each size range, standardize in the [-1; 1] range
+prop_ppsr <- prop_ppsr %>% 
+  group_by(opt_pp) %>% 
+  mutate(size_int = (size_int - min(abs(size_int)))/(max(abs(size_int)) - min(abs(size_int)))) %>% 
+  ungroup()
+```
+
+::: callout-important
+Which optimal size-range should we choose?
+
+-   find some metric within the size-based matrices?
+
+-   find the size-range that best mimic other matrices, such as the distance-based one
+:::
+
+## Compare with distance-based matrix
+
+Load the distance based matrix and process it.
+
+```{r load_ks_mat}
+load("data/07.ks_matrix.Rdata")
+
+# Plot our original matrix
+ggplot(df_mat_ks) +
+  geom_tile(aes(x = t1, y = t2, fill = ks)) +
+  scale_fill_viridis_c(limits = c(0, 1), na.value = NA) +
+  labs(x = "Predator", y = "Prey", fill = "KS metric") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# First, we need to make the KS matrix symmetric
+# For this, we create a second version of the matrix but we swap t1 and t2
+df_mat_ks_sym <- df_mat_ks %>% 
+  # swap column names using a temporary column
+  rename(tmp = t1, t1 = t2) %>% 
+  rename(t2 = tmp) %>% 
+  # reorganise columns
+  select(t1, t2, ks) %>% 
+  # bind with the original matrix
+  bind_rows(df_mat_ks)
+
+# Replace NA by zeros (i.e. no interaction)
+df_mat_ks_sym <- df_mat_ks_sym %>% mutate(ks = replace_na(ks, 0))
+
+# Plot again
+ggplot(df_mat_ks_sym) +
+  geom_tile(aes(x = t1, y = t2, fill = ks)) +
+  scale_fill_viridis_c(limits = c(0, 1), na.value = NA) +
+  labs(x = "Predator", y = "Prey", fill = "KS metric") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Good
+```
+
+Let’s now compare the size-based matrices and the distance-based one.
+
+```{r size_vs_ks}
+#| fig-width: 10
+#| fig-height: 12
+#| fig-align: center
+
+comp <- prop_ppsr %>% 
+  # join size-based and distance-based
+  left_join(df_mat_ks_sym %>% rename(predator = t1, prey = t2), by = join_by(predator, prey), relationship = "many-to-many") %>% 
+  # compate difference in both metrics
+  mutate(diff = size_int - ks)
+
+comp %>% 
+  ggplot() +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  geom_point(aes(x = prop_pp_in, y = ks)) +
+  coord_fixed() +
+  facet_wrap(~opt_pp, ncol = 2)
+```
+
+Let’s now have a look at the differences.
+
+```{r comp_size_ks}
+#| fig-width: 10
+#| fig-height: 12
+#| fig-align: center
+
+# Plot the differences as matrices
+ggplot(comp) +
+  geom_tile(aes(x = predator, y = prey, fill = diff)) +
+  #scale_fill_viridis_c(limits = c(0, 1)) +
+  scale_fill_gradient2(low = "#ca0020", high = "#0571b0") +
+  labs(x = "Predator", y = "Prey", fill = "Diff (size - ks)") +
+  coord_fixed() +
+  facet_wrap(~opt_pp, ncol = 2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r plot_diff_dist}
+# Plot the distribution of differences
+ggplot(comp, aes(x = diff, y = opt_pp)) +
+  geom_vline(xintercept = 0, colour = "grey", linewidth = 2) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", colour = "red", shape = 4, size = 3) +
+  labs(x = "Diff (size - ks)", y = "Consid. opt. PPSR") +
+  theme_classic()
+```
+
+The optimal range seems to be c(3, 12). Let’s keep this matrix.
+
+## Symmetrize the matrix
+
+Compared to the co-occurrence and distance-based matrix, the size-based matrix is not symmetrical:  pairs A-B and B-A don’t have the same values. Let’s fix this by taking the max between A-B and B-A.
+
+```{r symm}
+# Select the chosen size range
+df_size <- prop_ppsr %>% 
+  filter(opt_pp == "c(3, 12)") %>% 
+  select(t1 = predator, t2 = prey, size_int)
+
+# Symmetrize it
+df_size <- df_size %>% 
+  # build pair from t1 and t2 (same pair for t1 - t2 and t2 - t1)
+  mutate(pair = case_when(
+    t1 < t2 ~ paste(t1, t2, sep = " - "),
+    .default = paste(t2, t1, sep = " - ")
+  ), .before = t1) %>% 
+  group_by(pair) %>% 
+  # take the max by pair
+  summarise(size_int = max(size_int), .groups = "drop") %>% 
+  # retrieve t1 and t2
+  separate(pair, into = c("t1", "t2"), sep = " - ")
+
+# Plot result
+ggplot(df_size) +
+  geom_raster(aes(x = t1, y = t2, fill = size_int)) +
+  labs(x = "t1", y = "t2", fill = "Int") +
+  coord_fixed() +
+  scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+All good, save it!
+
+## Save
+
+```{r save_mat}
+save(df_size, file = "data/16.size_matrix.Rdata")
+```

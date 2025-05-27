@@ -34,11 +34,13 @@ Assemble intra and inter scores.
 ```{r assemble}
 # Intra
 df_intra_mat <- df_intra_scores %>% 
-  select(t1 = taxon, t2 = taxon, kuiper_stat, z_score, dir, sig)
+  select(t1 = taxon, t2 = taxon, kuiper_stat, z_score, dir, sig) %>% 
+  filter(sig) # Keep only significant interactions
 
 # Inter
 df_inter_mat <- df_inter_scores %>% 
   select(pair, kuiper_stat, z_score, dir, sig) %>% 
+  filter(sig) %>% # Keep only significant interactions
   separate_wider_delim(pair, delim = "-", names = c("t1", "t2"))
 # and generate reverse of t1 / t2
 #df_inter_mat_bis <- df_inter_mat %>% rename(t2 = t1, t1 = t2)
@@ -59,7 +61,7 @@ df_pairs <- df_intra_mat %>%
 taxa <- sort(unique(df_pairs$t1))
 df_mat_ks <- crossing(t1 = taxa, t2 = taxa) %>% 
   filter(t1 <= t2) %>% 
-  left_join(df_pairs %>% filter(sig), by = join_by(t1, t2))
+  left_join(df_pairs, by = join_by(t1, t2))
 
 
 # Plot Kuiper stat and Z-score
@@ -78,7 +80,23 @@ ggplot(df_mat_ks) +
   coord_fixed()
 ```
 
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAABH0lEQVR4XmNgGAVDCqxdvzVhzcbNm6mBK6uqVqObDwf///9nXLt+SzG6JlJxTW3tVpBZ6OajgP3797Os3bClFV0zsbiuoXEfyAx0c7GCRTt3cq9Zv7UX3RBCuL6x8TBIL7p5eMGqVbv512zYMgvdMFy4san1FEgPujlEgbVrd0gCg3EJuqHouLm59TxILbp+ksCqjdvV12zcshLdcBhuamm7BFKDro8ssGbjRr01G7aux7Ckte0qSA5dPUVg9frNDkDLNsGDq7X9GkgMXR1VwNoNm0MgPmm/DmKjy49wwLjIbzM1MLq5GIBxgc9mhm2eFGGwGYQA42wvDI2kYrAZhADjdEyNpGKwGYQA42Q3DI2kYrAZBEGfy2aq4FEw5AAASl8F3R9fQqAAAAAASUVORK5CYII= "Run All Chunks Above")
+Plot Z-score.
+
+```{r mat_z}
+ggplot(df_mat_ks) +
+  geom_raster(aes(x = t1, y = t2, fill = z_score)) +
+  geom_text(data = df_mat_ks %>% filter(dir == "further"), aes(x = t1, y = t2), label = "×") +
+  scale_fill_viridis_c(na.value = NA) +
+  labs(fill = "Z-score") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    axis.text.y = element_text(size = 7),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  ) + 
+  coord_fixed()
+```
 
 This time let’s plot the matrix with the direction of the interaction.
 
@@ -102,6 +120,8 @@ ggplot(df_mat_ks) +
 
 ## Reformat and save
 
+Kuiper statistic.
+
 ```{r save}
 #| fig-column: body-outset
 #| out-width: 100%
@@ -111,22 +131,53 @@ ggplot(df_mat_ks) +
 df_mat_ks <- df_mat_ks %>% 
   mutate(
     # standardise between 0 and 1
-    ks = (
+    int_dist = (
       kuiper_stat - min(kuiper_stat, na.rm = TRUE)) / 
       (max(kuiper_stat, na.rm = TRUE) - min(kuiper_stat, na.rm = TRUE)),
     # assign negative values for avoidance
-    ks = ifelse(dir == "further", -ks, ks)
+    int_dist = ifelse(dir == "further", -int_dist, int_dist)
     ) %>% 
-  select(t1, t2, ks)
+  select(t1, t2, int_dist)
 
 ggplot(df_mat_ks) +
-  geom_tile(aes(x = t1, y = t2, fill = ks)) +
-  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", limits = c(-1, 1), na.value = NA) +
-  labs(x = "Taxon 1", y = "Taxon 2", fill = "KS\nint.") +
+  geom_tile(aes(x = t1, y = t2, fill = int_dist)) +
+  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", na.value = NA) +
+  labs(x = "Taxon 1", y = "Taxon 2", fill = "Dist\nint.") +
   coord_fixed() +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Save it
-save(df_mat_ks, file = "data/07.ks_matrix.Rdata")
+save(df_mat_ks, file = "data/07.distance_matrix.Rdata")
+```
+
+Z-score.
+
+```{r save_z}
+#| fig-column: body-outset
+#| out-width: 100%
+
+## Keep only taxa and Z-score
+## Standardise intercation strength between -1 and 1, and assign negative values for organisms #further away than expected.
+#df_mat_ks <- df_mat_ks %>% 
+#  mutate(
+#    # standardise between 0 and 1
+#    int_dist = (
+#      z_score - min(z_score, na.rm = TRUE)) / 
+#      (max(z_score, na.rm = TRUE) - min(z_score, na.rm = TRUE)),
+#    # assign negative values for avoidance
+#    int_dist = ifelse(dir == "further", -int_dist, int_dist)
+#    ) %>% 
+#  select(t1, t2, int_dist)
+#
+#ggplot(df_mat_ks) +
+#  geom_tile(aes(x = t1, y = t2, fill = int_dist)) +
+#  scale_fill_gradient2(low = "#ef8a62", high = "#67a9cf", na.value = NA) +
+#  labs(x = "Taxon 1", y = "Taxon 2", fill = "Dist\nint.") +
+#  coord_fixed() +
+#  theme_classic() +
+#  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#
+## Save it
+#save(df_mat_ks, file = "data/07.distance_matrix.Rdata")
 ```

@@ -1,0 +1,577 @@
+---
+title: "Compare matrices from the different methods: distances, co-occurrence and size"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+#| echo: false
+#| warning: false
+source("utils.R")
+```
+
+For a strict comparison of these matrices, they should share the same properties:
+
+-   symmetrical, i.e. the value for t1-t2 is the same as for t2-t1
+
+-   range of values
+
+    -   values in the \[-1; 1\] interval
+
+    -   min value is -1 or max value is 1
+
+    -   shift between negative and positive interaction should be at 0
+
+## Read matrices
+
+### Distance-based matrix
+
+```{r read_dist}
+load("data/07.distance_matrix.Rdata")
+# Select relevant columns
+df_dist <- df_mat_ks %>% 
+  select(t1, t2, dist_int = int_dist)
+# Check value distribution
+summary(df_dist)
+
+# Plot matrix
+ggplot(df_dist) +
+  geom_raster(aes(x = t1, y = t2, fill = dist_int)) +
+  labs(x = "t1", y = "t2", fill = "Dist int") +
+  coord_fixed() +
+  scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Co-occurrence matrix
+
+```{r read_cooc}
+load("data/15b.co_occurrence_matrix.Rdata")
+# Keep revelant columns
+df_cooc <- df_cooc %>% 
+  select(t1, t2, cooc_int)
+summary(df_cooc)
+
+# Plot the matrix
+ggplot(df_cooc) +
+  geom_raster(aes(x = t1, y = t2, fill = cooc_int)) +
+  labs(x = "t1", y = "t2", fill = "Cooc") +
+  coord_fixed() +
+  scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+All good.
+
+### Size-based matrix
+
+```{r read_size}
+load("data/16.size_matrix.Rdata")
+
+# Plot the matrix
+ggplot(df_size) +
+  geom_raster(aes(x = t1, y = t2, fill = size_int)) +
+  labs(x = "t1", y = "t2", fill = "Size\nint.") +
+  coord_fixed() +
+  scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Join matrices and plot
+
+Let’s join the distance-based, co-occurrence and size-based matrices.
+
+```{r assemble_mat}
+# Assemble matrices
+df_mat <- df_cooc %>% 
+  left_join(df_size, by = join_by(t1, t2)) %>% 
+  left_join(df_dist, by = join_by(t1, t2)) %>% 
+  mutate(pair = paste(t1, t2, sep = " - "), .after = t2)
+summary(df_mat %>% select(contains("int")))
+```
+
+All metrics could not be computed for each pair. This is something we need to account for when plotting.
+
+Let’s do a first version where we drop all pairs for which at least one metric is missing.
+
+### Drop missing
+
+```{r drop}
+# Drop pairs for which at least one value is missing
+df_drop <- df_mat %>% drop_na()
+  
+# Reshape to longer df
+df_drop_long <- df_drop %>% pivot_longer(cooc_int:dist_int, names_to = "method")
+
+# Little trick for polar plot
+# Duplicate the first variable to close the circle
+df_drop_1 <- df_drop_long %>% 
+  arrange(method) %>% 
+  mutate(
+    var = case_when(
+      method == "cooc_int" ~ "1",
+      method == "size_int" ~ "2",
+      method == "dist_int" ~ "3",
+    )
+  )
+df_drop_2 <- df_drop_1 %>% 
+  filter(var == "1") %>% 
+  mutate(var = "6") %>% 
+  bind_rows(df_drop_1)
+  
+# Circular plot
+ggplot(df_drop_2, aes(x = var, y = value)) +
+  # Ticks annotation
+  annotate("text", x = c(1.03, 2.03, 2.97), y = 1, label = "1") +
+  annotate("text", x = 1, y = 1, label = "-", colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 2, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 3, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_point(aes(x = var, y = 0), colour = "red") +
+  # Points on axes 
+  geom_point(size = 0.5) +
+  # Lines
+  geom_line(aes(group = pair), alpha = 0.5, linewidth = 0.1, colour = "darkblue") +
+  scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
+  coord_radial() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12)
+  )
+```
+
+```{r}
+# Circular plot
+ggplot(df_drop_2, aes(x = var, y = value)) +
+  # Ticks annotation
+  annotate("text", x = c(1.03, 2.03, 2.97), y = 1, label = "1") +
+  annotate("text", x = 1, y = 1, label = "-", colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 2, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 3, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_hline(yintercept = 0, linewidth = 0.3, colour = "black") +
+  geom_point(aes(x = var, y = 0), colour = "red") +
+  # Points on axes 
+  geom_point(size = 0.5) +
+  # Lines
+  geom_line(aes(group = pair), alpha = 0.5, linewidth = 0.1, colour = "darkblue") +
+  scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
+  coord_radial() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12)
+  )
+```
+
+In this version, we have the same number of lines between each axes, but values do not go to 1 anymore.
+
+Let’s try without dropping, but highlight these with a different colour.
+
+### Retain missing
+
+```{r retain}
+# Reain pairs for which at least one value is missing but flag them
+df_retain <- df_mat %>% 
+  rowwise() %>%
+  # if mean(cooc_int, dist_int, size_int) is NA, then one is missing
+  mutate(missing = is.na(sum(c_across(cooc_int:dist_int)))) %>% 
+  ungroup()
+  
+# Reshape to longer df
+df_retain_long <- df_retain %>% pivot_longer(cooc_int:dist_int, names_to = "method")
+
+# Little trick for polar plot
+# Duplicate the first variable to close the circle
+df_retain_1 <- df_retain_long %>% 
+  arrange(method) %>% 
+  mutate(
+    var = case_when(
+      method == "cooc_int" ~ "1",
+      method == "size_int" ~ "2",
+      method == "dist_int" ~ "3",
+    )
+  )
+df_retain_2 <- df_retain_1 %>% 
+  filter(var == "1") %>% 
+  mutate(var = "6") %>% 
+  bind_rows(df_retain_1)
+  
+# Circular plot
+ggplot(df_retain_2, aes(x = var, y = value)) +
+  # Ticks annotation
+  annotate("text", x = c(1.03, 2.03, 2.97), y = 1, label = "1") +
+  annotate("text", x = 1, y = 1, label = "-", colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 2, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 3, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_point(aes(x = var, y = 0), colour = "red") +
+  geom_hline(yintercept = 0, linewidth = 0.3, colour = "black") +
+  # Lines
+  geom_line(aes(group = pair, colour = !missing, alpha = missing), linewidth = 0.1) +
+  # Points on axes 
+  geom_point(size = 0.5) +
+  scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
+  labs(colour = "All metrics", alpha = "All metrics") +
+  scale_colour_manual(values = c("TRUE" = "darkblue", "FALSE" = "orange")) +
+  scale_alpha_manual(values = c(0.5, 0.5)) +
+  coord_radial() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12)
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1))) 
+```
+
+Let’s check what happens if we hide the orange lines. It should be the same plot as when dropping pairs with one missing value.
+
+```{r hide_missing}
+# Circular plot
+ggplot(df_retain_2, aes(x = var, y = value)) +
+  # Ticks annotation
+  annotate("text", x = c(1.03, 2.03, 2.97), y = 1, label = "1") +
+  annotate("text", x = 1, y = 1, label = "-", colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 2, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 3, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_point(aes(x = var, y = 0), colour = "red") +
+  geom_hline(yintercept = 0, linewidth = 0.3, colour = "black") +
+  # Lines
+  geom_line(aes(group = pair, colour = !missing, alpha = missing), linewidth = 0.1) +
+  # Points on axes 
+  geom_point(size = 0.5) +
+  scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
+  labs(colour = "All metrics", alpha = "All metrics") +
+  scale_colour_manual(values = c("TRUE" = "darkblue", "FALSE" = "orange")) +
+  scale_alpha_manual(values = c(0.5, 0)) +
+  coord_radial() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12)
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1))) 
+```
+
+All good!
+
+::: callout-note
+Which version do we want? I think the version with blue and orange lines is more informative. It highlights that the distance-based method finds fewer interactions.
+:::
+
+Let’s try adding correlation values on the plot.
+
+### Add correlation to plot
+
+```{r add_corr}
+# Compute correlations for each pair of metrics
+corr_size_cooc <- cor(
+  df_retain$size_int, 
+  df_retain$cooc_int, 
+  method = "spearman", 
+  use = "complete.obs"
+)
+
+corr_size_dist <- cor(
+  df_retain$size_int, 
+  df_retain$dist_int, 
+  method = "spearman", 
+  use = "complete.obs"
+)
+
+corr_dist_cooc <- cor(
+  df_retain$dist_int, 
+  df_retain$cooc_int, 
+  method = "spearman", 
+  use = "complete.obs"
+)
+
+# Circular plot with correlations
+ggplot(df_retain_2, aes(x = var, y = value)) +
+  # Ticks annotation
+  annotate("text", x = c(1.03, 2.03, 2.97), y = 1, label = "1") +
+  annotate("text", x = 1, y = 1, label = "-", colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 2, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_textpath(aes(x = 3, y = 1, label = "-"), linetype = 0, colour = "grey90", size = 5) +
+  geom_point(aes(x = var, y = 0), colour = "red") +
+  geom_hline(yintercept = 0, linewidth = 0.3, colour = "black") +
+  # Lines
+  geom_line(aes(group = pair, colour = !missing, alpha = missing), linewidth = 0.1) +
+  # Points on axes 
+  geom_point(size = 0.5) +
+  scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
+  labs(colour = "All metrics", alpha = "All metrics") +
+  scale_colour_manual(values = c("TRUE" = "darkblue", "FALSE" = "orange")) +
+  scale_alpha_manual(values = c(0.5, 0.5)) +
+  # Correlation values
+  annotate("text", x = 1.5, y = 1, label = paste0("ρ = ", round(corr_size_cooc, digits = 2))) +
+  annotate("text", x = 2.5, y = 0.8, label = paste0("ρ = ", round(corr_size_dist, digits = 2))) +
+  annotate("text", x = 3.5, y = 1, label = paste0("ρ = ", round(corr_dist_cooc, digits = 2))) +
+  coord_radial() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12)
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1))) 
+```
+
+## Mantel test
+
+### First version: fill NA with 0
+
+Matrices need to be complete: fill NA with 0.
+
+```{r mantel}
+# List taxa
+taxa <- sort(unique(df_cooc$t1))
+
+# Prepare common dataframe
+df_cross <- crossing(t1 = taxa, t2 = taxa) %>% filter(t1 < t2)
+
+# Replace NA by zero
+df_cooc_fill <- df_cross %>% left_join(df_cooc, by = join_by(t1, t2))
+df_size_fill <- df_cross %>% left_join(df_size, by = join_by(t1, t2))
+df_dist_fill <- df_cross %>% left_join(df_dist, by = join_by(t1, t2))
+
+
+# To matrix
+cooc_met <- df_cooc_fill %>% 
+  pivot_wider(names_from = t2, values_from = cooc_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+size_met <- df_size_fill %>% 
+  pivot_wider(names_from = t2, values_from = size_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+dist_met <- df_dist_fill %>% 
+  pivot_wider(names_from = t2, values_from = dist_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+# Symmetrize the matrix
+cooc_met[lower.tri(cooc_met)] = t(cooc_met)[lower.tri(cooc_met)]
+size_met[lower.tri(size_met)] = t(size_met)[lower.tri(size_met)]
+dist_met[lower.tri(dist_met)] = t(dist_met)[lower.tri(dist_met)]
+
+# As distance matrix
+cooc_met <- as.dist(cooc_met, diag = TRUE, upper = FALSE)
+size_met <- as.dist(size_met, diag = TRUE, upper = FALSE)
+dist_met <- as.dist(dist_met, diag = TRUE, upper = FALSE)
+
+# Replace NA by 0
+cooc_met[is.na(cooc_met)] <- 0
+size_met[is.na(size_met)] <- 0
+dist_met[is.na(dist_met)] <- 0
+
+# Mantel test
+m2_cs <- mantel(cooc_met, size_met, method = "spearman")
+m2_cd <- mantel(cooc_met, dist_met, method = "spearman")
+m2_sd <- mantel(size_met, dist_met, method = "spearman")
+```
+
+Display all Mantel tests results in a single table.
+
+```{r mantel_table}
+
+m_res <- m2_cs
+mantel_res <- lapply(list(m2_cs, m2_cd, m2_sd), function(m_res) {
+  tibble(
+    # Names of tested metrics
+    pair = paste(as.character(m_res$call)[2], as.character(m_res$call)[3], sep = " - "),
+    stat = m_res$statistic,
+    signif = m_res$signif
+  )
+}) %>% 
+  bind_rows()
+mantel_res
+```
+
+### Second version: keep only non empty row and columns
+
+For this case, we only retain taxa with which we can build a complete matrix. For this we need to iterate over taxonomic groups and retain only those for which we have the distance metric.
+
+```{r non_empty}
+# Initiate empty list of retained taxa
+retained_taxa <- c()
+
+## Successively add taxa using walk
+walk(taxa, function(new_taxon) {
+  df_add <- df_cross %>%
+    # Add new taxon and keep previously added taxa
+    filter((t1 %in% c(new_taxon, retained_taxa)) & (t2 %in% c(new_taxon, retained_taxa))) %>%
+    left_join(df_dist, by = join_by(t1, t2))
+
+  # Check if NA in added values
+  if (!any(is.na(df_add$dist_int))) {
+    # If not NA, then add taxon to retained taxa
+    retained_taxa <<- c(retained_taxa, new_taxon)
+  }
+})
+
+```
+
+This is the list of retained taxa: `r retained_taxa`
+
+Let’s keep only these taxa in all matrices.
+
+```{r filter_ne}
+df_dist_ret <- df_dist %>% 
+  filter(t1 %in% retained_taxa & t2 %in% retained_taxa)
+summary(df_dist_ret %>% filter(t1 != t2))
+
+# Plot our new distance matrix
+ggplot(df_dist_ret) +
+  geom_raster(aes(x = t1, y = t2, fill = dist_int)) +
+  labs(x = "t1", y = "t2", fill = "Dist int") +
+  coord_fixed() +
+  scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+df_cooc_ret <- df_cooc %>% 
+  filter(t1 %in% retained_taxa & t2 %in% retained_taxa)
+summary(df_cooc_ret %>% filter(t1 != t2))
+
+df_size_ret <- df_size %>% 
+  filter(t1 %in% retained_taxa & t2 %in% retained_taxa)
+summary(df_size_ret %>% filter(t1 != t2))
+```
+
+We have one NA is the co-occurrence matrix. Let’s replace it by zero.
+
+```{r fill_ne}
+df_cooc_ret <- df_cooc_ret %>% mutate(cooc_int = replace_na(cooc_int, 0))
+```
+
+Let’s now convert all this to matrices and perform Mantel test.
+
+```{r mantel_ne}
+# To matrix
+cooc_met <- df_cooc_ret %>% 
+  pivot_wider(names_from = t2, values_from = cooc_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+size_met <- df_size_ret %>% 
+  pivot_wider(names_from = t2, values_from = size_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+dist_met <- df_dist_ret %>% 
+  pivot_wider(names_from = t2, values_from = dist_int) %>% 
+  column_to_rownames(var = "t1") %>% 
+  as.matrix()
+
+# Symmetrize the matrix
+cooc_met[lower.tri(cooc_met)] = t(cooc_met)[lower.tri(cooc_met)]
+size_met[lower.tri(size_met)] = t(size_met)[lower.tri(size_met)]
+dist_met[lower.tri(dist_met)] = t(dist_met)[lower.tri(dist_met)]
+
+# As distance matrix, do not keep the diagonal
+cooc_met <- as.dist(cooc_met, diag = FALSE, upper = FALSE)
+size_met <- as.dist(size_met, diag = FALSE, upper = FALSE)
+dist_met <- as.dist(dist_met, diag = FALSE, upper = FALSE)
+
+# Mantel test
+mantel(cooc_met, size_met, method = "spearman")
+mantel(cooc_met, dist_met, method = "spearman")
+mantel(size_met, dist_met, method = "spearman")
+```
+
+## Binary associations, using the distance-based metric as the truth
+
+Let’s use the size-based association metric as the truth, using a binary classification of whether or not there is an association. Let’s then see if distance-based and co-occurrence metrics can retrieve this truth.
+
+```{r bin_assoc}
+## Convert association metrics to binary values: TRUE for an association, FALSE for no association
+# Size-based values: "truth"
+# Flag negative size values as NA: these are the cases with no association.
+df_size_bin <- df_size %>% 
+  mutate(size_assoc = ifelse(size_int <= 0, FALSE, TRUE)) %>% 
+  select(-size_int)
+summary(df_size_bin)
+
+# Distance-based values
+df_dist_bin <- df_dist %>% 
+  mutate(dist_assoc = ifelse(is.na(dist_int), FALSE, TRUE)) %>% 
+  select(-dist_int)
+
+# Co-occurrence values
+df_cooc_bin <- df_cooc %>% 
+  mutate(cooc_assoc = ifelse(is.na(cooc_int), FALSE, TRUE)) %>% 
+  select(-cooc_int)
+
+
+## Store all together
+# Prepare all combinations of pairs
+df_comp_bin <- df_cross %>% 
+  # Join true association, based on size
+  left_join(df_size_bin, by = join_by(t1, t2)) %>% 
+  # Join distance based metric
+  left_join(df_dist_bin, by = join_by(t1, t2)) %>% 
+  # Join co-occurrence metric
+  left_join(df_cooc_bin, by = join_by(t1, t2)) %>% 
+  # Replace NA in distance association by FALSE for no association
+  mutate(dist_assoc = replace_na(dist_assoc, FALSE))
+summary(df_comp_bin)
+
+## Compute precision and recall
+# Function to compute accuracy, precision and recall
+compute_metrics <- function(data, truth_col, pred_col) {
+  accuracy <- Accuracy(
+    y_true = as.factor(data[[truth_col]]), 
+    y_pred = as.factor(data[[pred_col]])
+  )
+  precision <- Precision(
+    y_true = as.factor(data[[truth_col]]), 
+    y_pred = as.factor(data[[pred_col]]), 
+    positive = TRUE
+  )
+  recall <- Recall(
+    y_true = as.factor(data[[truth_col]]), 
+    y_pred = as.factor(data[[pred_col]]), 
+    positive = TRUE
+  )
+  # Return results in a tibble
+  tibble(method = pred_col, accuracy = accuracy, precision = precision, recall = recall)
+}
+
+# Compute metrics for distance and co-occurrence metrics
+metrics <- bind_rows(
+  compute_metrics(df_comp_bin, "size_assoc", "dist_assoc"),
+  compute_metrics(df_comp_bin, "size_assoc", "cooc_assoc")
+)
+
+# Print the results
+print(metrics)
+```
