@@ -30,7 +30,7 @@ plankton <- plankton %>% filter(taxon %in% taxa)
 # Number of repetitions
 n_rep <-  100
 
-df_corr_met <- mclapply(1:n_rep, function(i) {
+df_corr <- mclapply(1:n_rep, function(i) {
   
   # Number of images to select
   n_sub <- 10000
