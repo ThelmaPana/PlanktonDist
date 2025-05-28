@@ -591,22 +591,42 @@ df_cooc <- df_cooc %>% select(t1, t2, assoc = cooc_int)
 load("data/16.size_matrix.Rdata")
 df_size <- df_size %>% select(t1, t2, assoc = size_int)
 
-# Replace Hydrozoa by Cnidaria
+# Replace Hydrozoa by Cnidaria and reorder pairs
 df_dist <- df_dist %>% 
   mutate(
     t1 = ifelse(t1 == "Hydrozoa", "Cnidaria", t1),
     t2 = ifelse(t2 == "Hydrozoa", "Cnidaria", t2)
-  )
+  ) %>% 
+  mutate(ordered = t1 <= t2) %>% 
+  mutate(
+    t_first = ifelse(!ordered, t2, t1),
+    t_last = ifelse(!ordered, t1, t2)
+  ) %>% 
+  select(t1 = t_first, t2 = t_last, assoc)
+
 df_cooc <- df_cooc %>% 
   mutate(
     t1 = ifelse(t1 == "Hydrozoa", "Cnidaria", t1),
     t2 = ifelse(t2 == "Hydrozoa", "Cnidaria", t2)
-  )
+  ) %>% 
+  mutate(ordered = t1 <= t2) %>% 
+  mutate(
+    t_first = ifelse(!ordered, t2, t1),
+    t_last = ifelse(!ordered, t1, t2)
+  ) %>% 
+  select(t1 = t_first, t2 = t_last, assoc)
+
 df_size <- df_size %>% 
   mutate(
     t1 = ifelse(t1 == "Hydrozoa", "Cnidaria", t1),
     t2 = ifelse(t2 == "Hydrozoa", "Cnidaria", t2)
-  )
+  ) %>% 
+  mutate(ordered = t1 <= t2) %>% 
+  mutate(
+    t_first = ifelse(!ordered, t2, t1),
+    t_last = ifelse(!ordered, t1, t2)
+  ) %>% 
+  select(t1 = t_first, t2 = t_last, assoc)
 
 # Assemble all for common colour scale
 df_all <- df_dist %>% 
@@ -648,8 +668,10 @@ ps5a <- ggplot(df_dist) +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    text = element_text(size = 8)
+    text = element_text(size = 8),
+    panel.grid = element_line(color = "grey80", size = 0.1)
   )
+
 
 ps5b <- ggplot(df_cooc) +
   geom_raster(aes(x = t1, y = t2, fill = assoc)) +
@@ -657,7 +679,8 @@ ps5b <- ggplot(df_cooc) +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    text = element_text(size = 8)
+    text = element_text(size = 8),
+    panel.grid = element_line(color = "grey80", size = 0.1)
   )
 
 ps5c <- ggplot(df_size) +
@@ -666,7 +689,8 @@ ps5c <- ggplot(df_size) +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    text = element_text(size = 8)
+    text = element_text(size = 8),
+    panel.grid = element_line(color = "grey80", size = 0.1)
   )
 
 # Assemble all
