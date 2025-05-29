@@ -575,3 +575,82 @@ metrics <- bind_rows(
 # Print the results
 print(metrics)
 ```
+
+## Explore specific cases highlighted in the paper
+
+### Acantharea
+
+According to the distance-based metric, Acantharea may be interacting with each other. We can’t compute the co-occurrence metric for intra-group, but let’s have a look at what was expected regarding the size-based metric.
+
+```{r size_acanth}
+# Get the size-based metric for Acantharea
+size_acant <- df_size %>% filter(t1 == "Acantharea" & t2 == "Acantharea")
+size_acant
+
+# Plot distribution of size-based interactions
+ggplot(df_size) + 
+  geom_vline(xintercept = 0, colour = "grey", linewidth = 2) +
+  geom_density(aes(x = size_int)) +
+  geom_vline(xintercept = size_acant$size_int, colour = "red") +
+  labs(x = "Size-based metric", y = "Density") +
+  theme_classic()
+```
+
+The size-based metric for Acantharea (red vertical line) predicts a less-than-random predation within the group.
+
+### Ctenophora - Oithona
+
+In intergroup distances, Ctenophora and Oithona were found to be further away than expected. Let’s check what was predicted by the co-occurrence and size-based metrics.
+
+```{r size_cteno_oitho}
+# Get size-based metric for the pair of interest
+size_cteno_oitho <- df_size %>% filter(t1 == "Cop_Oithona" & t2 == "Ctenophora")
+size_cteno_oitho
+
+# Plot distribution of size-based interactions
+ggplot(df_size) + 
+  geom_vline(xintercept = 0, colour = "grey", linewidth = 2) +
+  geom_density(aes(x = size_int)) +
+  geom_vline(xintercept = size_cteno_oitho$size_int, colour = "red") +
+  labs(x = "Size-based metric", y = "Density") +
+  theme_classic()
+```
+
+The size-based metric predicts a somewhat high predation probability between Ctenophora and Oithona. Let’s check the size distribution of both groups.
+
+```{r esd_cteno_oitho}
+#|cache: false
+
+# Read plankton and images
+plankton <- read_parquet("data/00.plankton_clean.parquet")
+# Keep only groups of interest
+plankton <- plankton %>% filter(taxon %in% c("Ctenophora", "Cop_Oithona"))
+gc()
+# Convert ESD from px to mm
+plankton <- plankton %>% mutate(esd = esd * 51 / 1000)
+
+# Randomly select 10,000 objects of each taxon
+plankton <- plankton %>% 
+  group_by(taxon) %>% 
+  slice_sample(n = 10000) %>% 
+  ungroup()
+
+# Plot boxplots of ESD
+ggplot(plankton) + 
+  geom_boxplot(aes(x = esd, y = taxon)) +
+  scale_x_continuous(trans = "log1p") +
+  labs(x = "ESD (mm)", y = "Taxon") +
+  theme_classic()
+```
+
+Ctenophora is indeed bigger than Oithona, predation by Ctenophora on Oithona makes sense.
+
+Let’s now have a look at the co-occurrence metric.
+
+```{r cooc_cteno_oitho}
+# Get co-occurrence metric for the pair of interest
+cooc_cteno_oitho <- df_cooc %>% filter(t1 == "Cop_Oithona" & t2 == "Ctenophora")
+cooc_cteno_oitho
+```
+
+It’s NaN, because the correlation was not significant.
