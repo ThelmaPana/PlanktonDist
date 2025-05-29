@@ -27,6 +27,15 @@ Read saved scores for both intra and inter distances and keep only relevant colu
 load("data/06b.df_intra_scores.Rdata")
 # Inter scores
 load("data/06c.df_inter_scores.Rdata")
+
+# Plankton subsample, to get a complete list of taxonomic groups
+load("data/00.plankton_sub.Rdata")
+taxa <- plankton_sub %>% 
+  select(taxon) %>% 
+  distinct() %>% 
+  arrange(taxon) %>% 
+  filter(!taxon %in% c("Rhizaria", "Collodaria_colonial")) %>% 
+  pull(taxon)
 ```
 
 Assemble intra and inter scores.
@@ -58,7 +67,6 @@ df_pairs <- df_intra_mat %>%
 #| out-width: 100%
 
 # Create all combination of taxa and join scores
-taxa <- sort(unique(df_pairs$t1))
 df_mat_ks <- crossing(t1 = taxa, t2 = taxa) %>% 
   filter(t1 <= t2) %>% 
   left_join(df_pairs, by = join_by(t1, t2))
@@ -154,9 +162,9 @@ save(df_mat_ks, file = "data/07.distance_matrix.Rdata")
 Z-score.
 
 ```{r save_z}
-#| fig-column: body-outset
-#| out-width: 100%
-
+##| fig-column: body-outset
+##| out-width: 100%
+#
 ## Keep only taxa and Z-score
 ## Standardise intercation strength between -1 and 1, and assign negative values for organisms #further away than expected.
 #df_mat_ks <- df_mat_ks %>% 
