@@ -52,6 +52,11 @@ plankton <- plankton %>%
   mutate(median_esd = median(esd)) %>% 
   ungroup()
 
+# Save median ESD by plankton group 
+plankton_esd <- plankton %>% select(taxon, median_esd) %>% distinct() %>% arrange(taxon)
+save(plankton_esd, file = "data/16.plankton_esd.Rdata")
+
+# Plot ESD distribution per group
 ggplot(plankton) +
   geom_boxplot(aes(x = fct_reorder(taxon, median_esd), y = esd), outlier.size = 0.5) +
   scale_y_log10() +
@@ -259,6 +264,21 @@ prop_ppsr <- prop_ppsr %>%
   ungroup()
 ```
 
+Let’s plot computed matrices.
+
+```{r plot_size_mat}
+#| fig-width: 10
+#| fig-height: 12
+#| fig-align: center
+ggplot(prop_ppsr) + 
+  geom_tile(aes(x = predator, y = prey, fill = size_int)) +
+  scale_fill_gradient2(low = "#ca0020", high = "#0571b0", na.value = "grey90") +
+  labs(x = "Predator", y = "Prey", fill = "Size\nint") +
+  coord_fixed() +
+  facet_wrap(~opt_pp, ncol = 2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
 ::: callout-important
 Which optimal size-range should we choose?
 
@@ -272,11 +292,14 @@ Which optimal size-range should we choose?
 Load the distance based matrix and process it.
 
 ```{r load_ks_mat}
-load("data/07.ks_matrix.Rdata")
+load("data/07.distance_matrix.Rdata")
+
+df_mat_ks <- df_mat_ks %>% 
+  mutate(t1 = as.factor(t1), t2 = as.factor(t2))
 
 # Plot our original matrix
 ggplot(df_mat_ks) +
-  geom_tile(aes(x = t1, y = t2, fill = ks)) +
+  geom_tile(aes(x = t1, y = t2, fill = int_dist)) +
   scale_fill_viridis_c(limits = c(0, 1), na.value = NA) +
   labs(x = "Predator", y = "Prey", fill = "KS metric") +
   coord_fixed() +
@@ -289,16 +312,16 @@ df_mat_ks_sym <- df_mat_ks %>%
   rename(tmp = t1, t1 = t2) %>% 
   rename(t2 = tmp) %>% 
   # reorganise columns
-  select(t1, t2, ks) %>% 
+  select(t1, t2, int_dist) %>% 
   # bind with the original matrix
   bind_rows(df_mat_ks)
 
 # Replace NA by zeros (i.e. no interaction)
-df_mat_ks_sym <- df_mat_ks_sym %>% mutate(ks = replace_na(ks, 0))
+df_mat_ks_sym <- df_mat_ks_sym %>% mutate(int_dist = replace_na(int_dist, 0))
 
 # Plot again
 ggplot(df_mat_ks_sym) +
-  geom_tile(aes(x = t1, y = t2, fill = ks)) +
+  geom_tile(aes(x = t1, y = t2, fill = int_dist)) +
   scale_fill_viridis_c(limits = c(0, 1), na.value = NA) +
   labs(x = "Predator", y = "Prey", fill = "KS metric") +
   coord_fixed() +
@@ -318,12 +341,12 @@ comp <- prop_ppsr %>%
   # join size-based and distance-based
   left_join(df_mat_ks_sym %>% rename(predator = t1, prey = t2), by = join_by(predator, prey), relationship = "many-to-many") %>% 
   # compate difference in both metrics
-  mutate(diff = size_int - ks)
+  mutate(diff = size_int - int_dist)
 
 comp %>% 
   ggplot() +
   geom_abline(slope = 1, intercept = 0, colour = "red") +
-  geom_point(aes(x = prop_pp_in, y = ks)) +
+  geom_point(aes(x = prop_pp_in, y = int_dist)) +
   coord_fixed() +
   facet_wrap(~opt_pp, ncol = 2)
 ```
@@ -339,7 +362,7 @@ Let’s now have a look at the differences.
 ggplot(comp) +
   geom_tile(aes(x = predator, y = prey, fill = diff)) +
   #scale_fill_viridis_c(limits = c(0, 1)) +
-  scale_fill_gradient2(low = "#ca0020", high = "#0571b0") +
+  scale_fill_gradient2(low = "#ca0020", high = "#0571b0", na.value = "grey90") +
   labs(x = "Predator", y = "Prey", fill = "Diff (size - ks)") +
   coord_fixed() +
   facet_wrap(~opt_pp, ncol = 2) +
