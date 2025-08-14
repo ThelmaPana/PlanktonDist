@@ -40,6 +40,7 @@ library(khroma)
 library(chroma)
 library(ggrepel)
 library(geomtextpath)
+library(ggpattern)
 
 
 

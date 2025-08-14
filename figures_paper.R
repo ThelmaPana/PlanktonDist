@@ -23,7 +23,6 @@ load("data/06a.df_all_qt.Rdata")
 load("data/06b.df_intra_qt.Rdata")
 load("data/06c.df_inter_qt.Rdata")
 
-
 # Replace Hydrozoa by Cnidaria
 df_intra_qt <- df_intra_qt %>% 
   mutate(taxon = ifelse(taxon == "Hydrozoa", "Cnidaria", taxon)) %>% 
@@ -64,7 +63,7 @@ cols <- df_1a %>%
 # Plot
 p1a <- ggplot() +
   geom_hline(yintercept = 0, linewidth = 1, colour = "grey80") +
-  geom_path(data = df_1a, aes(x = x_axis, y = diff, group = taxon, colour = taxon), alpha = 0.5, linewidth = 0.4) +
+  geom_path(data = df_1a, aes(x = x_axis, y = diff, group = taxon, colour = taxon), linewidth = 0.2) +
   geom_path(data = df_1a %>% filter(taxon == "all"), aes(x = x_axis, y = diff)) +
   labs(x = "Distance quantiles", y = "Null - plankton quant. (cm)", colour = "Plankton group") +
   scale_colour_manual(values = cols$colour) +
@@ -86,7 +85,7 @@ p1a <- ggplot() +
 ## Inter distances
 p1b <- ggplot(df_inter_qt) +
   geom_hline(yintercept = 0, colour = "grey", linewidth = 1) +
-  geom_path(aes(x = x_axis, y = diff, group = pair), alpha = 0.2, linewidth = 0.3) +
+  geom_path(aes(x = x_axis, y = diff, group = pair), alpha = 0.2, linewidth = 0.2) +
   labs(x = "Distance quantiles", y = "Null - plankton quant. (cm)") +
   scale_x_continuous(expand = c(0, 0)) +
   theme_classic() +
@@ -207,7 +206,7 @@ df_mat <- df_cooc %>%
   left_join(df_dist, by = join_by(t1, t2)) %>% 
   mutate(pair = paste(t1, t2, sep = " - "), .after = t2)
 
-# Reain pairs for which at least one value is missing but flag them
+# Retain pairs for which at least one value is missing but flag them
 df_retain <- df_mat %>% 
   rowwise() %>%
   # if mean(cooc_int, dist_int, size_int) is NA, then one is missing
@@ -290,6 +289,28 @@ p3
 #ggsave(p3, filename = "figures/figure_3.pdf", width = 11.4, height = 9, units = "cm", bg = "white")
 # ρ does not render in the pdf, convert png to pdf outside of R
 ggsave(p3, filename = "figures/figure_3.png", width = 11.4, height = 7, units = "cm", bg = "white")
+
+
+
+## One plot, not circular
+df_mat_long <- df_mat |> 
+  pivot_longer(cooc_int:dist_int, names_to = "metric") |> 
+  mutate(metric = factor(metric, levels = c("size_int", "dist_int", "cooc_int")))
+
+ggplot(df_mat_long) +
+  geom_hline(yintercept = 0, colour = "grey", linewidth = 1) +
+  geom_point(aes(x = metric, y = value), size = 0.8) + 
+  geom_path(
+    data = df_mat_long |> filter(metric != "cooc_int"),
+    aes(x = metric, y = value, group = pair), alpha = 0.2, linewidth = 0.2
+  ) +
+  geom_path(
+    data = df_mat_long |> filter(metric != "size_int"),
+    aes(x = metric, y = value, group = pair), alpha = 0.2, linewidth = 0.2
+  ) +
+  scale_x_discrete(labels = c("Size", "Dist.", "Co-oc.")) +
+  labs(x = "", y = "Association metric") +
+  theme_classic()
 
 
 ## Figure S2: Distance thresholds ----
@@ -527,48 +548,87 @@ ps3
 ggsave(ps3, filename = "figures/figure_s3.png", width = 17.8, height = 15, units = "cm", bg = "white")
 
 
-# Is there a link with organisms size?
+## Figure S4: Distances vs organisms size ----
+#--------------------------------------------------------------------------#
+## Load plankton ESD
+load("data/16.plankton_esd.Rdata")
+# Replace Hydrozoa by Cnidaria
+plankton_esd <- plankton_esd |> mutate(taxon = ifelse(taxon == "Hydrozoa", "Cnidaria", taxon))
 
-## Read plankton and images
-#plankton <- read_parquet("data/00.plankton_clean.parquet") # no need to use the X correction here
-#
-## List taxonomic groups
-#taxa <- plankton %>% select(taxon) %>% distinct() %>% pull(taxon) %>% sort()
-## Drop unwanted groups
-#taxa <- setdiff(taxa, c("Collodaria_colonial", "Rhizaria"))
-#plankton <- plankton %>% filter(taxon %in% taxa)
-#
-## Convert ESD from px to mm
-#plankton <- plankton %>% mutate(esd = esd * 51 / 1000)
-#plankton_esd <- plankton %>% 
-#  group_by(taxon) %>% 
-#  summarise(median_esd = median(esd)) %>% 
-#  ungroup() %>% 
-#  mutate(taxon = ifelse(taxon == "Hydrozoa", "Cnidaria", taxon)) # Rename hydrozoa to cnidaria
-#df_intra <- df_intra %>% 
-#  left_join(plankton_esd, by = join_by(taxon))
-#
-#ggplot() + 
-#  #geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, group = log_n_dist, y = log_kuiper_stat), colour = "grey", width = 0.4, linewidth = 0.3, outlier.size = 0.3) +
-#  geom_polygon(data = reg_poly, aes(x = log_n_dist, y = y), alpha = 0.1) +
-#  geom_point(data = df_intra %>% filter(!sig), aes(x = log_n_dist, y = log_kuiper_stat), size = 0.5, colour = "grey") +
-#  #geom_point(data = df_intra %>% filter(sig), aes(x = log_n_dist, y = log_kuiper_stat, colour = taxon), size = 0.5) +
-#  geom_point(data = df_intra %>% filter(sig), aes(x = log_n_dist, y = log_kuiper_stat, colour = median_esd), size = 0.5) +
-#  #scale_colour_manual(values = cols$colour[-1]) +
-#  scale_colour_viridis_c() +
-#  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = c(2, 4, 6, 8), limits = c(3.8, 9.3)) +
-#  scale_y_continuous(labels = label_math(expr = 10^.x, format = force), breaks = c(-4, -3, -2, -1, 0), limits = c(-4.5, -0.9)) +
-#  labs(x = "Number of distances", y = "Kuiper statistic", colour = "ESD") +
-#  theme_classic() 
-#
-## No link between non-randomness and ESD.
+## NNKS and PNKS for intra distances
+load("data/04b.null_ks.Rdata")
+
+# Prepare data for regression lines
+reg_lines <- tibble(log_n_dist = c(3.8, 9.3)) %>% 
+  crossing(null_ks_rq_coef %>% filter(tau != "mean")) %>% 
+  mutate(log_ks = slope * log_n_dist + intercept) %>% 
+  arrange(tau)
+
+# Redo the ribbon for the same range as for regression lines
+reg_poly <- reg_lines %>% 
+  mutate(order = c(1,4,2,3)) %>% 
+  arrange(order) %>% 
+  select(log_n_dist, y = log_ks) %>% 
+  mutate(name = c("ymin", "ymax", "ymin", "ymax"))
+
+load("data/05b.intra_distances_ks.Rdata")
+
+# Drop Rhizaria and colonial Collodaria, replace Hydroza by Cnidaria
+df_intra <- df_intra %>% 
+  filter(!taxon %in% c("Rhizaria", "Collodaria_colonial")) %>% 
+  mutate(taxon = ifelse(taxon == "Hydrozoa", "Cnidaria", taxon))
+
+# For plankton distances, log-transform number of distances and Kuiper statistic
+df_intra <- df_intra %>% 
+  mutate(
+    log_n_dist = log10(n_dist),
+    log_kuiper_stat = log10(kuiper_stat)
+  ) %>% 
+  filter(n_dist > n_dist_min)
 
 
-## Figure S4: Agent-based model parameter choice ----
+## Join with plankton ESD
+df_intra <- df_intra |> left_join(plankton_esd, by = join_by(taxon))
+
+# Plot it
+ps4_b <- ggplot() + 
+  geom_polygon(data = reg_poly, aes(x = log_n_dist, y = y), alpha = 0.1) +
+  #geom_point(data = df_intra %>% filter(!sig), aes(x = log_n_dist, y = log_kuiper_stat), size = 0.5, colour = "grey") +
+  geom_point(data = df_intra, aes(x = log_n_dist, y = log_kuiper_stat, colour = median_esd), size = 0.8) +
+  scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = c(2, 4, 6, 8), limits = c(3.8, 9.3)) +
+  scale_y_continuous(labels = label_math(expr = 10^.x, format = force), breaks = c(-4, -3, -2, -1, 0), limits = c(-4.5, -0.9)) +
+  scale_colour_viridis_c() +
+  labs(x = "Number of distances", y = "Kuiper statistic", colour = "Median\nESD (mm)") +
+  theme_classic() 
+
+
+## Second version, with distances
+load("data/06b.df_intra_qt.Rdata")
+
+# Replace Hydrozoa by Cnidaria
+df_intra_qt <- df_intra_qt %>% 
+  mutate(taxon = ifelse(taxon == "Hydrozoa", "Cnidaria", taxon)) %>% 
+  arrange(taxon) |> 
+  left_join(plankton_esd, by = join_by(taxon))
+
+
+ps4_a <- ggplot() +
+  geom_hline(yintercept = 0, linewidth = 1, colour = "grey80") +
+  geom_path(data = df_intra_qt, aes(x = x_axis, y = diff, group = taxon, colour = median_esd), linewidth = 0.4) +
+  labs(x = "Distance quantiles", y = "Null - plankton quant. (cm)", colour = "Median\nESD (mm)") +
+  scale_colour_viridis_c() +
+  scale_x_continuous(expand = c(0, 0)) +
+  theme_classic()
+
+ps4 <- ps4_a + ps4_b + plot_layout(ncol = 1, guides = "collect") + plot_annotation(tag_levels = "a")
+ps4
+ggsave(ps4, filename = "figures/figure_s4.png", width = 17.8, height = 15, units = "cm", bg = "white")
+
+## Figure S5: Agent-based model parameter choice ----
 #--------------------------------------------------------------------------#
 load("data/12c.best_mods.Rdata")
 
-ps4 <- ggplot(best_mods) +
+ps5 <- ggplot(best_mods) +
   geom_count(aes(x = sr, y = d_length_cm, color = after_stat(n), size = after_stat(n))) +
   scale_colour_viridis_c(breaks = c(1, 10, 20, 30)) +
   scale_y_discrete(drop = F) +
@@ -576,11 +636,11 @@ ps4 <- ggplot(best_mods) +
   labs(x = "Sensory radius (cm)", y = "Displacement length (cm)", colour = "Number of\nselected\nmodels", size = "Number of\nselected\nmodels") +
   guides(color = 'legend') +
   theme_classic()
-ps4
-ggsave(ps4, filename = "figures/figure_s4.png", width = 17.8, height = 8, units = "cm", bg = "white")
+ps5
+ggsave(ps5, filename = "figures/figure_s5.png", width = 17.8, height = 8, units = "cm", bg = "white")
 
 
-## Figure S5: Association matrices ----
+## Figure S6: Association matrices ----
 #--------------------------------------------------------------------------#
 
 # Read matrices
@@ -662,7 +722,7 @@ df_size <- crossing(t1 = taxa, t2 = taxa) %>%
   )
 
 # Subplots
-ps5a <- ggplot(df_dist) +
+ps6a <- ggplot(df_dist) +
   geom_raster(aes(x = t1, y = t2, fill = assoc)) +
   labs(x = "", y = "", fill = "Association") +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
@@ -673,7 +733,7 @@ ps5a <- ggplot(df_dist) +
   )
 
 
-ps5b <- ggplot(df_cooc) +
+ps6b <- ggplot(df_cooc) +
   geom_raster(aes(x = t1, y = t2, fill = assoc)) +
   labs(x = "", y = "", fill = "Association") +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
@@ -683,7 +743,7 @@ ps5b <- ggplot(df_cooc) +
     panel.grid = element_line(color = "grey80", size = 0.1)
   )
 
-ps5c <- ggplot(df_size) +
+ps6c <- ggplot(df_size) +
   geom_raster(aes(x = t1, y = t2, fill = assoc)) +
   labs(x = "", y = "", fill = "Association") +
   scale_fill_gradient2(na.value = NA, low = "#ca0020", high = "#0571b0", limits = c(min(df_all$assoc, na.rm = TRUE), max(df_all$assoc, na.rm = TRUE))) +
@@ -694,14 +754,14 @@ ps5c <- ggplot(df_size) +
   )
 
 # Assemble all
-ps5 <- ps5a + guide_area() + ps5b + ps5c +
+ps6 <- ps6a + guide_area() + ps6b + ps6c +
   plot_layout(ncol = 2, guides = "collect", axes = "collect", axis_titles = "collect") + 
   plot_annotation(tag_levels = "a")
-ps5
-ggsave(ps5, filename = "figures/figure_s5.png", width = 17.8, height = 18, units = "cm", bg = "white")
+ps6
+ggsave(ps6, filename = "figures/figure_s6.png", width = 17.8, height = 18, units = "cm", bg = "white")
 
 
-## Figure S7: Effect of recall ----
+## Figure S8: Effect of recall ----
 #--------------------------------------------------------------------------#
 # Recall values for taxonomic groups: "data/raw/classif_report_aft_thres.csv"
 load("data/04b.null_ks.Rdata")
@@ -721,7 +781,7 @@ reg_poly <- reg_lines %>%
   mutate(name = c("ymin", "ymax", "ymin", "ymax"))
 
 # Plot
-ps7 <- ggplot() +
+ps8 <- ggplot() +
   #geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = reg_poly, aes(x = log_n_dist, y = y), alpha = 0.1) +
   geom_point(data = rec_dist, aes(x = log_n_dist, y = log_kuiper_stat, colour = rec_val), size = 0.8) +
@@ -730,7 +790,8 @@ ps7 <- ggplot() +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   theme_classic()
-ps7
-ggsave(ps7, filename = "figures/figure_s7.png", width = 17.8, height = 8, units = "cm", bg = "white")
+ps8
+ggsave(ps8, filename = "figures/figure_s8.png", width = 17.8, height = 8, units = "cm", bg = "white")
+
 
 
