@@ -1,151 +1,124 @@
 # PlanktonDist
 
-Investigate distances between plankton organisms in situ at the centimetre scale.
+Analyze distances between plankton organisms in situ at the centimeter scale and investigate potential ecological interactions.
 
-### Analyses
+## Overview
 
-#### Steps
+PlanktonDist is an R-based pipeline to study the spatial distribution of plankton. It compares observed distances to those expected under a random distribution of such organisms, infers interactions using multiple metrics, and models observed distances with a simple agent-based attraction model.
 
-To detect patterns in distances between planktonic organisms, we need a null hypothesis: "planktonic organisms are randomly distributed". Null data is generated for this hypothesis, by generating random points within a set of images, so that the number of random points in images is representative of the number of planktonic organisms in images. Distances within ISIIS  data are then compared to null data to investigate the following points.
+### Hypothesis
 
--   **overall** distances: if overall distances differ from what expected by the null data, this might reveal global interactions / non-randomness in plankton distribution.
+Distances between planktonic organisms carry ecological information that can be used to infer potential interactions.
 
--   **intrataxa** distances: if distances within a taxonomic group differ from what expected by the null data, this might reveal intrataxa interactions.
+### Workflow
 
--   **intertaxa** distances: if distances between a pair of taxonomic groups differ from what expected by the null data, this might reveal intertaxa interactions.
+1.  **Compare observed distances to random expectations**\
+    Generate null datasets with randomly positioned organisms, compute distances under random distribution, and compare them to observed distances (overall, intra-group, and inter-group).
 
-#### Elements of discussion
+2.  **Compare inferred interactions to other metrics**\
+    Use non-randomness of observed distances as an interaction metric and compare it to size-based (i.e. empirical) and co-occurrence metrics.
 
-Things to account for:
+3.  **Build an agent-based model**\
+    Implement a simple attraction model and optimize its parameters to reproduce observed distances.
 
--   biological
+------------------------------------------------------------------------
 
-    -   motility & trophic status
-
-    -   division
-
-    -   size of organisms
-
--   non-biological
-
-    -   segmentation recall: 92% overall but vary between classes
-
-    -   classification precision & recall + interclass confusions
-
-    -   variations in environmental conditions
-
-    -   variations in towing speed, i.e. pixel size in `x` axis can vary. We can use round solitary blacks to detect these changes.
-
-    -   turbulence
-
-    -   approximation of 3D distances (imaged volume) to 2D distances (image)
-
-## Repo organisation
+## Repository Structure
 
 ### Data
 
-Where data lives, includes:
+-   `raw/`: raw data files
+-   `distances/`: saved distance calculations as Parquet files
 
--   `raw`: raw data
+### Scripts & Quarto Documents
 
--   `distances`: saved distances as parquet files
+> **Note:**\
+> - Files are to be run sequentially.\
+> - `.R` files are R scripts.\
+> - Files without an extension in this list are Quarto documents (`.qmd`) that generate `.html` reports.
 
-### Scripts
+#### Data cleaning & correction
 
-#### Main steps
+-   `00.clean_data.R`: clean plankton data\
+-   `01a.x_axis_correction`: correct pixel deformation on x axis\
+-   `01b.z_axis_test`: check that the lack of information on the z axis is not a problem
 
--   00 − Clean data
+#### Distances computation
 
-    -   `00.clean_data`: Read raw data, clean it, save it.
+-   `02a.compute_all_distances.R`: compute all distances for all images\
+-   `02b.compute_intra_distances.R`: compute intra-group distances for all images\
+-   `02c.compute_inter_distances.R`: compute inter-group distances for all images
 
--   01 − Perform tests and corrections
+#### Thresholding
 
-    -   `01a.x_axis_correction`: Generate data to correct distortion in `x` axis using Solitary Collodaria and perform correction.
+-   `03a.threshold_all_distances`: find the threshold (max distance) for all distances\
+-   `03b.threshold_intra_distances`: find threshold for intra distances\
+-   `03c.threshold_inter_distances`: find threshold for inter distances
 
-    -   `01b.z_axis_test`: Check the effect of the lack of information on the `z` axis.
+#### Null datasets
 
--   02 − Compute distances
+-   `04a.generate_null_datasets.R`: generate multiple null datasets and compute random distances\
+-   `04b.process_null_datasets.R`: filter random distances and perform pairwise comparisons
 
-    -   `02a.compute_all_distances`: Compute all plankton distances regardless of taxonomy.
+#### Distance analyses
 
-    -   `02b.compute_intra_distances`: Compute intrataxa distances.
+-   `05a.process_all_distances.R`: compare all distances to random distances\
+-   `05b.process_intra_distances.R`: compare intra distances to random distances\
+-   `05c.process_inter_distances.R`: compare inter distances to random distances\
+-   `06a.process_all_distances.R`: analyze results for all distances\
+-   `06b.process_intra_distances.R`: analyze results for intra distances\
+-   `06c.process_inter_distances.R`: analyze results for inter distances\
+-   `07.distance_matrix`: build an association matrix based on non-random distances
 
-    -   `02c.compute_inter_distances`: Compute intertaxa distances.
+#### Specific null datasets
 
--   03 − Identify distance threshold
+-   `10a.null_acantharea_prep.R`: generate null datasets for Acantharea only and compute distances\
+-   `10b.null_acantharea_analysis.R`: analyze results for null Acantharea\
+-   `11a.big_null_datasets.R`: generate 3 big (10\^8 distances) null datasets\
+-   `11b.big_null_datasets_analysis.R`: analyze results for big null datasets
 
-    -   `03a.threshold_all_distances`: Find optimal distance threshold using all distances.
+#### Agent-based model
 
-    -   `03b.threshold_intra_distances`: Find optimal distance threshold using intrataxa distances.
+-   `12a.ab_model_3d_set-up.R`: set-up the attraction agent-based model\
+-   `12b.ab_model_3d_run.R`: run the agent-based model for various parameters\
+-   `12c.ab_model_3d_gridsearch_analysis.R`: analyze results of gridsearch for optimal parameters\
+-   `12d.ab_model_3d_analysis.R`: analyze results of final agent-based model
 
-    -   `03c.threshold_inter_distances`: Find optimal distance threshold using intertaxa distances.
+#### Additional analyses
 
--   04 − Prepare null datasets
+-   `13.recall_effect.R`: investigate effect of recall on plankton distances\
+-   `14.day_vs_night.R`: check whether plankton distances differ between day and night\
 
-    -   `04a.generate_null_datasets`: Generate multiple null datasets with same properties as ISIIS dataset.
+#### Other association matrices
 
-    -   `04b.process_null_datasets`: Filter null datasets distances using the previously identified threshold and perform pairwise comparisons for various number of distances.
+-   `15a.cooc_matrix_explore.R`: explore co-occurrence methods\
+-   `15b.cooc_matrix_run.R`: compute co-occurrence metrics\
+-   `16.size_matrix.R`: compute size-based (empirical) metrics\
+-   `17.compare_matrices.R`: compare distance-based, co-occurrence, and size-based metrics\
 
--   05 − Filter and process plankton distances
+#### Additional checks on Acantharea
 
-    -   `05a.process_all_distances`: Filter all distances using the previously identified threshold and compute Kuiper statistic.
+-   `18.check_acantharea.R`: additional checks on Acantharea distances
 
-    -   `05b.process_intra_distances`: Filter intrataxa distances using the previously identified threshold and compute Kuiper statistic.
+#### Figures
 
-    -   `05c.process_inter_distances`: Filter intertaxa distances using the previously identified threshold and compute Kuiper statistic.
+-   `figures.R`: generate figures for presentations\
+-   `figures_paper.R`: generate figures for the paper
 
--   06 − Analyse results
+------------------------------------------------------------------------
 
-    -   `06a.analyse_all_distances`: Analyse all distances.
+## Setup & Usage
 
-    -   `06b.analyse_intra_distances`: Analyse intrataxa distances.
+1.  **Install R and Quarto** if not already installed.\
 
-    -   `06c.analyse_inter_distances`: Analyse intertaxa distances.
+2.  **Install dependencies with renv**:
 
--   07 − Interaction matrix
+    ``` r
+    renv::restore()
+    ```
 
-    -   `07.interaction_matrix`: Build the interaction matrix.
+    This installs all required R packages for the project.
 
-#### Other stuff & checks
+3.  Place raw data in `data/raw/`.
 
--   [ ] Agent-based model
-
-    -\> Develop a 3D agent based model to reproduce observations for all distances regardless of taxonomy.
-
-    `12a.ab_model_3d_run.R`
-
-    `12b.ab_model_3d_analysis`
-
--   [ ] Recall effect
-
-    -\> Make sure that the recall has no effect on detected patterns.
-
-    `13.recall_effect`
-
--   [ ] Big null datasets
-
-    -\> Make sure the Kuiper statistic values can be extrapolated for very large number of distances.
-
-    `11a.big_null_datasets.R`
-
-    `11b.big_null_datasets.analysis`
-
--   [ ] Null Acantharea dataset
-
-    -\> Make sure that the global null dataset is representative of a null dataset generated for one taxonomic group only.
-
-    `10a.null_acantharea_prep.R`
-
-    `10b.null_acantharea_analysis`
-
-## Loose ideas
-
--   H0: distances between individuals are independent from taxonomy
-
--   <https://www.zoology.ubc.ca/~krebs/downloads/krebs_chapter_06_2017.pdf>
-
--   Multitype point pattern
-
--   <https://www.emilyburchfield.org/courses/gsa/point_pattern_lab>
-
--   <https://geographicdata.science/book/notebooks/08_point_pattern_analysis.html>
+4.  Run scripts in numerical order to reproduce analyses and generate figures.
