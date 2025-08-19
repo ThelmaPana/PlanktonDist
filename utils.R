@@ -327,3 +327,70 @@ get_corr_pval <- function(t1, t2, abundance_mat, taxa_indices, method = "spearma
     return(list(corr = NA, p_val = NA))
   }
 }
+
+
+# Function to read vignette
+create_image_plot <- function(img_path) {
+  tryCatch({
+    # Read image
+    img <- imager::load.image(img_path)
+    # Drop 29 pixels at the bottom to remove scale bar
+    img <- imager::imsub(img, y < imager::height(img) - 29)
+    # Create a plot object instead of displaying directly
+    p <- ggplot() +
+      annotation_raster(img, xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+      theme_void() +
+      theme(plot.margin = unit(c(0,0,0,0), "mm"))
+    return(p)
+  }, error = function(e) {
+    # Return empty plot if image fails
+    ggplot() +
+      annotate("text", x = 0.5, y = 0.5, label = "Failed", size = 2) +
+      theme_void() +
+      theme(plot.margin = unit(c(0,0,0,0), "mm"))
+  })
+}
+
+
+
+# Function to create image mosaic and return both plot and sampled data
+create_image_mosaic <- function(object_data, mosaic_size = 10) {
+  n_images <- mosaic_size^2
+  
+  # Sample images
+  if (nrow(object_data) < n_images) {
+    warning(paste("Only", nrow(object_data), "images available"))
+    sampled_objects <- object_data
+    n_missing <- n_images - nrow(object_data)
+  } else {
+    sampled_objects <- object_data |> slice_sample(n = n_images)
+    n_missing <- 0
+  }
+  
+  # Create list of plots
+  plot_list <- list()
+  
+  # Add actual image plots
+  for (i in 1:nrow(sampled_objects)) {
+    plot_list[[i]] <- create_image_plot(sampled_objects$path_to_img[i])
+  }
+  
+  # Add empty plots if needed
+  if (n_missing > 0) {
+    for (i in (nrow(sampled_objects) + 1):n_images) {
+      plot_list[[i]] <- ggplot() + theme_void()
+    }
+  }
+  
+  # Arrange in grid
+  mosaic_plot <- do.call(arrangeGrob, c(plot_list, list(ncol = mosaic_size)))
+  
+  # Convert to ggplot object for patchwork compatibility
+  mosaic_ggplot <- ggplot() +
+    annotation_custom(mosaic_plot) +
+    theme_void() +
+    coord_fixed()
+  
+  # Return both plot and data
+  return(mosaic_ggplot)
+}

@@ -1,0 +1,190 @@
+---
+title: "Check results for Acantharea"
+author: "Thelma Panaïotis"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+lightbox: true
+execute:
+  warning: false
+  cache: true
+  freeze: false
+---
+
+```{r set_up}
+#| cache: false
+#| echo: false
+#| warning: false
+source("utils.R")
+```
+
+Acantharea were found to be much closer than expected under a random distribution. Let’s check if these could be the result of an artifact of any kind. More specifically, we’ll checked that observed distances are not caused by just a few very dense patched, and that objects identified as Acantharea are indeed Acantharea.
+
+## Read data
+
+Let’s start by reading data and selecting only Acantharea.
+
+```{r read}
+# Read plankton
+plankton <- read_parquet("data/00.plankton_clean.parquet")
+
+# Keep only Acantharea
+plankton <- plankton %>% filter(taxon == "Acantharea")
+
+# Read images
+images <- plankton %>% select(transect, img_name, datetime, lat, lon, depth) %>% distinct()
+```
+
+## Check for potential clusters of Acantharea
+
+### Where are high density of Acantharea?
+
+First, to detect potential clusters, we need to count Acantharea per image. Then plot it for each transect.
+
+```{r count}
+# Count Acantharea per image
+counts <- plankton %>% count(transect, img_name)
+counts %>% arrange(desc(n))
+
+# Look at number of Acantharea per image for each transect
+ggplot(counts) + 
+  geom_point(aes(x = n, y = transect), size = 0.8) +
+  scale_x_continuous() +
+  theme_classic()
+```
+
+Images with many Acantharea (i.e. potential clusters) are found in cross current transects.
+
+### Does this affect Acantharea distances?
+
+Let’s now check whether there is a difference in distance distribution across transects.
+
+```{r dist_transect}
+# Read Acantharea distances
+file <- "data/distances/02b.intra_distances_Acantharea.parquet"
+df <- read_parquet(file)
+
+## Filter distances
+# True distances
+dist <- df %>% select(img_name, dist) %>% filter(dist < dist_thr)
+# Random distances
+rand_dist <- df %>% select(img_name, rand_dist) %>% filter(rand_dist < dist_thr)
+
+# Plot distribution of distances per transect
+dist |> 
+  left_join(images |> select(transect, img_name), by = join_by(img_name)) |> 
+  ggplot() +
+  geom_boxplot(aes(x = dist, y = transect)) +
+  labs(x = "Distance between Acantharea (cm)", y = "Transect") +
+  theme_classic()
+```
+
+Distances are quite similar across transects, with some difference for Lagrangian 10, but this transect was only a few minutes long due to ISIIS malfunction, so this explains different distances. However, this accounts for very few distances in the total dataset.
+
+Let’s still check whether there is a link between the number of objects per image and the distribution of distances.
+
+```{r count_dist}
+# For each image, plot the distribution of plankton and random distances VS number of objects
+bind_rows(
+    dist %>% mutate(type = "plankton"),
+    rand_dist %>% rename(dist = rand_dist) %>% mutate(type = "rand")
+  ) |> 
+  # join distances with number of objects per image
+  left_join(counts, by = join_by(img_name)) |> 
+  ggplot() +
+  geom_boxplot(aes(x = n, y = dist, group = interaction(n, type), colour = type)) +
+  labs(x = "Nb Acanth per image", y = "Distance between Acanth (cm)", colour = "Type") +
+  theme_classic()
+```
+
+There is no link between the number of Acantharea per image and the distance between Acantharea. That may seem counter-intuitive, but actually when adding more objects into an image, it adds both smaller and larger distances, so that the distribution of distances stays the same. On the opposite, the distance to nearest neighbour does decrease.
+
+### Check one patch
+
+Look for one patch in cross current 2.
+
+```{r clust_plot}
+cc2 <- plankton |> 
+  # keep only objects in CC2
+  filter(transect == "cross_current_02") |> 
+  # count Acant per image
+  count(img_name, datetime, lat, lon, dist, depth)
+
+# Plot concentrations along CC2
+ggplot(cc2) + 
+  geom_point(aes(x = dist, y = -depth, colour = n), size = 0.8) +
+  scale_colour_viridis_c() +
+  labs(x = "Distance from shore (km)", y = "Depth (m)", colour = "Nb Acant\nper image")
+
+# Let’s zoom in!
+ggplot(cc2 |> filter(dist > 51 & dist < 52.5 & depth < 30)) + 
+  geom_point(aes(x = dist, y = -depth, colour = n), size = 0.8) +
+  scale_colour_viridis_c() +
+  labs(x = "Distance from shore (km)", y = "Depth (m)", colour = "Nb Acant\nper image")
+
+```
+
+Let’s check distances within this patch.
+
+```{r patch_dist}
+# Compute median distance per image
+dist_img <- dist |> 
+  group_by(img_name) |> 
+  summarise(med_dist = median(dist))
+
+# Join with image metadata
+cc2_dist <- cc2 |> 
+  filter(dist > 51 & dist < 52.5 & depth < 30) |> 
+  rename(dist_shore = dist) |> 
+  left_join(dist_img, by = join_by(img_name))
+
+# Plot median distance in transect (across patch)
+ggplot(cc2_dist) + 
+  geom_point(aes(x = dist_shore, y = -depth, colour = med_dist), size = 0.8) +
+  scale_colour_viridis_c() +
+  labs(x = "Distance from shore (km)", y = "Depth (m)", colour = "Med. dist\nper image\n(cm)")
+```
+
+As expected, median distances are not smaller within the Acantharea patch.
+
+::: callout-note
+Acantharea patches do not influence the distribution of distances between Acantharea.
+:::
+
+## Look for classification mistakes
+
+Let’s also check that distances observed between Acantharea are not caused by classification mistakes, e.g. dead particles or noise classified as Acantharea. That said, given the results above, segmentation and classification artefacts should not affect distances, provided that these are isotropic. Let’s still have a look at Acantharea vignettes, focusing on cross current transects.
+
+```{r select_vig}
+set.seed(123)
+sample_img <- counts |> 
+  # keep images in a few CC transects
+  filter(transect %in% c("cross_current_02", "cross_current_03", "cross_current_04", "cross_current_05")) |> 
+  # keep images with more than 20 objects
+  filter(n > 20) |> 
+  # randomly choose 5 image per transect
+  group_by(transect) |> 
+  slice_sample(n = 5) |>
+  ungroup()
+# NB notice the timestamps of images: many were collected at very similar times, suggesting sampling across Acantharea patches
+# Get particles for these images from Marie at LOV
+
+# Get Acanth from these images in the dataset
+sample_acant <- plankton |> filter(img_name %in% sample_img$img_name)
+
+# Compute path to vignette from image name and object id
+sample_acant <- sample_acant |> 
+  mutate(path_to_img = paste0("data/raw/test_acant/", img_name, "/", object_id, ".png"))
+
+# And finally generate a mosaic of 20×20
+p_acant <- create_image_mosaic(sample_acant, mosaic_size = 20)
+p_acant
+```
+
+On the 400 displayed objects, maybe 1 or 2 could be something else that Acantharea, thus the precision in this is \> 99%. This means that observed distances are not generated by segmentation or classification artifacts.
+
+::: callout-note
+In conclusion, shorter distances observed between Acantharea are not caused by patches / thin layers, neither by segmentation or classification artifacts.
+:::
