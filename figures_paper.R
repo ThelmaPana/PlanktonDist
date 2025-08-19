@@ -267,9 +267,9 @@ p3 <- ggplot(df_retain_2, aes(x = var, y = value)) +
   # Points on axes 
   geom_point(size = 0.5) +
   scale_x_discrete(expand = c(0, 0), breaks = c("1", "2", "3"), labels = c("1" = "Co-oc.", "2" = "Size", "3" = "Dist.")) +
-  labs(colour = "All metrics", alpha = "All metrics") +
-  scale_colour_manual(values = c("TRUE" = "darkblue", "FALSE" = "orange")) +
-  scale_alpha_manual(values = c(0.5, 0.5)) +
+  labs(colour = "", alpha = "") +
+  scale_colour_manual(values = c("TRUE" = "darkblue", "FALSE" = "orange"), labels = c("Not all metrics", "All metrics")) +
+  scale_alpha_manual(values = c(0.5, 0.5), labels = c("Not all metrics", "All metrics")) +
   # Correlation values
   annotate("text", x = 1.5, y = 1,   label = paste0("ρ = ", round(corr_size_cooc$estimate, digits = 2)), size = 3) +
   annotate("text", x = 2.5, y = 0.8, label = paste0("ρ = ", round(corr_size_dist$estimate, digits = 2)), size = 3) +
@@ -761,7 +761,80 @@ ps6
 ggsave(ps6, filename = "figures/figure_s6.png", width = 17.8, height = 18, units = "cm", bg = "white")
 
 
-## Figure S8: Effect of recall ----
+## Figure S7: Acantharea ----
+#--------------------------------------------------------------------------#
+# 1st panel: patch
+# 2nd panel: mosaic of Acantharea
+plankton
+
+## Panel A
+# Read plankton
+acanth <- read_parquet("data/00.plankton_clean.parquet") |> 
+  # keep only Acantharea
+  filter(taxon == "Acantharea")
+
+# Read plankton images
+images <- read_parquet("data/00.images_clean.parquet")
+
+# Count Acantharea per image
+counts_acanth <- acanth %>% count(transect, img_name)
+
+# Prepare data for plot
+df_s7 <- images |> 
+  # keep only relevant columns in images
+  select(transect, img_name, datetime, lon, lat, depth, dist) |> 
+  # keep only CC2
+  filter(transect == "cross_current_02") |> 
+  # focus on one patch
+  filter(dist > 51 & dist < 52.5 & depth < 30) |> 
+  # join with counts of Acantharea per image
+  left_join(counts_acanth, by = join_by(transect, img_name)) |> 
+  # replace missing counts by 0
+  replace_na(list(n = 0))
+
+# Create a subset with first, middle and last point for time annotation
+first_last <- df_s7 %>%
+  slice(c(7, 245, 370)) %>%
+  mutate(time_only = format(datetime, "%H:%M:%S"))  # extract time in HH:MM:SS format
+
+# Plot
+ps7a <- ggplot(df_s7) + 
+  geom_path(aes(x = dist, y = -depth), linewidth = 0.2, colour = "grey") +
+  geom_point(aes(x = dist, y = -depth, colour = n), size = 0.8) +
+  geom_text_repel(
+    data = first_last, aes(x = dist, y = -depth, label = time_only),
+    size = 3, nudge_x = 0.09, nudge_y = 0.5, force_pull = 1, segment.color = "black", segment.size = 0.3
+  ) +
+  scale_colour_viridis_c() +
+  labs(x = "Distance from shore (km)", y = "Depth (m)", colour = "Nb Acant\nper image")
+
+## Panel B
+# Mosaic of Acantharea
+# Select images
+set.seed(123)
+sample_img <- counts_acanth |> 
+  filter(transect %in% c("cross_current_02", "cross_current_03", "cross_current_04", "cross_current_05")) |> 
+  filter(n > 20) |> 
+  group_by(transect) |> 
+  slice_sample(n = 5) |>
+  ungroup()
+
+# Get Acanth from these images in the dataset
+sample_acant <- acanth |> 
+  filter(img_name %in% sample_img$img_name) |> 
+  # generate path to img
+  mutate(path_to_img = paste0("data/raw/test_acant/", img_name, "/", object_id, ".png"))
+
+# Generate mosaic
+ps7b <- create_image_mosaic(sample_acant, mosaic_size = 20)
+
+## Assemble
+ps7 <- ps7a + ps7b + plot_layout(ncol = 1, heights = c(1, 4)) + plot_annotation(tag_level = "a")
+ggsave(ps7, filename = "figures/figure_s7.png", width = 17.8, height = 20, units = "cm", bg = "white")
+
+
+
+## Figure S9: Effect of recall ----
 #--------------------------------------------------------------------------#
 # Recall values for taxonomic groups: "data/raw/classif_report_aft_thres.csv"
 load("data/04b.null_ks.Rdata")
@@ -781,7 +854,7 @@ reg_poly <- reg_lines %>%
   mutate(name = c("ymin", "ymax", "ymin", "ymax"))
 
 # Plot
-ps8 <- ggplot() +
+ps9 <- ggplot() +
   #geom_boxplot(data = null_ks_n_dist, aes(x = log_n_dist, y = log_kuiper_stat, group = log_n_dist), colour = "gray", outlier.shape = NA) +
   geom_polygon(data = reg_poly, aes(x = log_n_dist, y = y), alpha = 0.1) +
   geom_point(data = rec_dist, aes(x = log_n_dist, y = log_kuiper_stat, colour = rec_val), size = 0.8) +
@@ -790,8 +863,8 @@ ps8 <- ggplot() +
   scale_x_continuous(labels = label_math(expr = 10^.x, format = force), breaks = seq(2, 8, by = 2)) +
   scale_y_continuous(labels = label_math(expr = 10^.x, format = force)) +
   theme_classic()
-ps8
-ggsave(ps8, filename = "figures/figure_s8.png", width = 17.8, height = 8, units = "cm", bg = "white")
+ps9
+ggsave(ps9, filename = "figures/figure_s9.png", width = 17.8, height = 8, units = "cm", bg = "white")
 
 
 
